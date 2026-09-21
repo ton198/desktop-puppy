@@ -1,0 +1,35 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / ReSharper
+.idea/
+*.DotSettings.user
+
+# Test / coverage output
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Local app data and secrets
+.local/
+secrets/
+*.key
+*.pem
+*.pfx
+appsettings.Local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated local assets and reports
+artifacts/
+logs/
+reports/local/
