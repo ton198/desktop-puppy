@@ -29,7 +29,38 @@
 - [x] Updated `.gitignore` and `README.md` with the current phase and resume entry point.
 - [x] Verified the new core/placement tests pass (4 focused tests).
 
-## Current milestone contents
+
+## Test coverage audit — 2026-09-23
+
+Current automated test count: **6 passed, 0 failed**.
+
+Covered:
+
+- `ApplicationInfo.ProductName` smoke contract;
+- hit cooldown policy;
+- default settings policy;
+- injectable clock contract;
+- pet position clamping with a minimum visible edge;
+- missing-monitor fallback to the primary monitor.
+
+Verified outside unit tests:
+
+- Release compilation with 0 warnings and 0 errors;
+- application process starts and remains alive during a short startup smoke check;
+- `git diff --check` is clean.
+
+Not yet verified:
+
+- single-click delay versus double-click cancellation;
+- drag behavior and click suppression during drag;
+- right-click bubble display and bubble close button;
+- exit button behavior;
+- actual WPF transparency, topmost behavior, DPI scaling, multi-monitor movement, and monitor removal;
+- single-instance behavior;
+- tray, startup registration, fullscreen detection, foreground hooks, SQLite, usage statistics, AI, reports, settings persistence, and data deletion;
+- the full PRD acceptance matrix.
+
+The current 6-test suite must not be described as full MVP coverage. The next implementation milestone must add testable interaction controllers before relying on manual UI checks.\n## Current milestone contents
 
 The current implementation remains offline-only. It intentionally does **not** include:
 
@@ -76,4 +107,5 @@ The Phase 2 focused verification observed 4 passed tests and 0 failures. The ful
 3. Connect `PetPlacementPolicy` to a monitor adapter without moving Win32 calls into the WPF view.
 4. Keep the app offline and runnable while adding the native boundary.
 5. Update this file immediately after each verified milestone.
+
 
