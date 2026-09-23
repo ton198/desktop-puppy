@@ -11,13 +11,23 @@ namespace DesktopPuppy;
 public partial class App : Application
 {
     private PetWindow? _petWindow;
+    private ISingleInstanceGuard? _singleInstanceGuard;
     private UsageCollector? _usageCollector;
     private UsageSqliteStore? _usageStore;
+    private IForegroundWindowWatcher? _foregroundWatcher;
     private Timer? _usageAdvanceTimer;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        _singleInstanceGuard = new SingleInstanceGuard();
+        if (!_singleInstanceGuard.TryAcquire(ActivateExistingInstance))
+        {
+            Shutdown();
+            return;
+        }
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         StartUsageTracking();
@@ -33,17 +43,21 @@ public partial class App : Application
         _usageAdvanceTimer = null;
         _usageCollector?.Dispose();
         _usageCollector = null;
+        _foregroundWatcher = null;
         _usageStore?.Dispose();
         _usageStore = null;
+        _singleInstanceGuard?.Dispose();
+        _singleInstanceGuard = null;
         base.OnExit(e);
     }
 
     private void StartUsageTracking()
     {
+        var watcher = new WinEventForegroundWatcher();
         try
         {
             var clock = new SystemClock();
-            var watcher = new WinEventForegroundWatcher();
+            _foregroundWatcher = watcher;
             _usageStore = new UsageSqliteStore();
             _usageStore.Initialize();
             _usageCollector = new UsageCollector(
@@ -73,12 +87,44 @@ public partial class App : Application
         {
             _usageAdvanceTimer?.Dispose();
             _usageAdvanceTimer = null;
-            _usageCollector?.Dispose();
+            if (_usageCollector is not null)
+            {
+                _usageCollector.Dispose();
+            }
+            else
+            {
+                watcher.Dispose();
+            }
+
             _usageCollector = null;
+            _foregroundWatcher = null;
             _usageStore?.Dispose();
             _usageStore = null;
             // Usage tracking is optional at startup; the offline pet remains runnable.
         }
+    }
+
+    private void ActivateExistingInstance()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_petWindow is null)
+            {
+                return;
+            }
+
+            if (!_petWindow.IsVisible)
+            {
+                _petWindow.Show();
+            }
+
+            if (_petWindow.WindowState == WindowState.Minimized)
+            {
+                _petWindow.WindowState = WindowState.Normal;
+            }
+
+            _petWindow.Activate();
+        });
     }
 
     private sealed record UsageTimerState(UsageCollector Collector, IClock Clock);

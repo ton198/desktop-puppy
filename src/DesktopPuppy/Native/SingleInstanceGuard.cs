@@ -14,6 +14,10 @@ public sealed class SingleInstanceGuard : ISingleInstanceGuard
     private bool _ownsMutex;
     private bool _disposed;
 
+    public SingleInstanceGuard()
+        : this("Local\\DesktopPuppy.SingleInstance", "Local\\DesktopPuppy.Activate")
+    {
+    }
     public SingleInstanceGuard(string mutexName, string activationEventName)
     {
         if (string.IsNullOrWhiteSpace(mutexName))
@@ -217,4 +221,3 @@ public sealed class SingleInstanceGuard : ISingleInstanceGuard
         }
     }
 }
-
