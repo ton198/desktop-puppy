@@ -5,9 +5,9 @@
 **Last updated:** 2026-09-23
 **Latest verified step:** Unit tests 10/10, Windows UI tests 4/4 across 5 consecutive runs, and Release build 0 warnings/0 errors.
 **Current phase:** Phase 3 in progress — interaction controller and desktop UI automation verification
-**Current branch:** `codex/desktop-puppy-foundation`
-**Worktree:** `C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy`
-**Milestone commit:** `58949d9` — interaction controller and stabilized desktop UI automation tests
+**Current branch:** `main`
+**Worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy`
+**Milestone commit:** merged to `main` at `3ec582b` (interaction controller and stabilized desktop UI automation tests)
 **Base commit:** `c609a5f`
 
 ## Completed
@@ -122,7 +122,7 @@ The UI test project must be run on an interactive Windows desktop because it lau
 5. Update this file immediately after each verified milestone.
 
 
-## Post-commit verification note — 2026-09-23
+## Post-merge verification note — 2026-09-23
 
 - The first post-commit full verification exposed an intermittent UI-harness failure: one of four UI cases timed out; the failing case varied between double-click and drag.
 - Root cause: the harness used fixed sleeps after `SendInput` and could move the pointer before WPF had acquired native mouse capture.
