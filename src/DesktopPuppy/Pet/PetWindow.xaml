@@ -1,0 +1,128 @@
+<Window x:Class="DesktopPuppy.Pet.PetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Desktop Puppy"
+        Width="260"
+        Height="210"
+        MinWidth="200"
+        MinHeight="170"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        MouseLeftButtonDown="PetWindow_OnMouseLeftButtonDown"
+        MouseMove="PetWindow_OnMouseMove"
+        MouseRightButtonDown="PetWindow_OnMouseRightButtonDown"
+        MouseDoubleClick="PetWindow_OnMouseDoubleClick">
+    <Window.Resources>
+        <Style x:Key="ChromeButton" TargetType="Button">
+            <Setter Property="Width" Value="26" />
+            <Setter Property="Height" Value="26" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,4,4,0" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#FFF8FAFC" />
+            <Setter Property="Background" Value="#660F172A" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style x:Key="BubbleButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#FF334155" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" HorizontalAlignment="Right">
+            <Button x:Name="CloseButton"
+                    Style="{StaticResource ChromeButton}"
+                    Content="×"
+                    ToolTip="退出 Desktop Puppy"
+                    Click="CloseButton_OnClick" />
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="12,0,12,12">
+            <Border x:Name="BubbleBorder"
+                    Panel.ZIndex="2"
+                    Padding="12,9,8,9"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    MaxWidth="225"
+                    Background="#FFF8FAFC"
+                    BorderBrush="#FFCBD5E1"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="BubbleText"
+                               Grid.Column="0"
+                               MaxWidth="183"
+                               Foreground="#FF172033"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap" />
+                    <Button Grid.Column="1"
+                            Style="{StaticResource BubbleButton}"
+                            Content="×"
+                            ToolTip="关闭气泡"
+                            Click="BubbleCloseButton_OnClick" />
+                </Grid>
+            </Border>
+
+            <Grid Margin="0,42,0,0" HorizontalAlignment="Center" VerticalAlignment="Bottom">
+                <Ellipse Width="132"
+                         Height="92"
+                         Fill="#FFF5B971"
+                         Stroke="#FF7C3F20"
+                         StrokeThickness="3" />
+                <Ellipse Width="100" Height="72" Fill="#FFF7C98B" />
+
+                <Polygon Points="55,24 18,0 24,50"
+                         Fill="#FFE0A15B"
+                         Stroke="#FF7C3F20"
+                         StrokeThickness="3" />
+                <Polygon Points="77,24 114,0 108,50"
+                         Fill="#FFE0A15B"
+                         Stroke="#FF7C3F20"
+                         StrokeThickness="3" />
+
+                <Ellipse Width="11" Height="16" Fill="#FF172033" Margin="-29,-8,0,0" />
+                <Ellipse Width="11" Height="16" Fill="#FF172033" Margin="29,-8,0,0" />
+                <Ellipse Width="18" Height="12" Fill="#FF172033" Margin="0,17,0,0" />
+                <Path Data="M -19,30 Q 0,48 19,30"
+                      Stroke="#FF172033"
+                      StrokeThickness="3"
+                      Fill="Transparent"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round" />
+                <Ellipse Width="13" Height="9" Fill="#FFE47A6A" Margin="-51,16,0,0" />
+                <Ellipse Width="13" Height="9" Fill="#FFE47A6A" Margin="51,16,0,0" />
+
+                <TextBlock Text="OFFLINE"
+                           Foreground="#B83B261C"
+                           FontSize="10"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Bottom"
+                           Margin="0,0,0,10" />
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
