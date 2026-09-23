@@ -3,7 +3,7 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-23
-**Latest verified step:** Unit tests 10/10, Windows UI tests 4/4 across 5 consecutive runs, and Release build 0 warnings/0 errors.
+**Latest verified step:** Merged `main` passes 10 unit tests, 4 Windows UI tests, and Release build with 0 warnings/0 errors.
 **Current phase:** Phase 3 in progress — interaction controller and desktop UI automation verification
 **Current branch:** `main`
 **Worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy`
@@ -122,11 +122,12 @@ The UI test project must be run on an interactive Windows desktop because it lau
 5. Update this file immediately after each verified milestone.
 
 
-## Post-merge verification attempt — 2026-09-23
+## Post-merge verification — 2026-09-23
 
 - The first merged-main verification stopped before tests because the original checkout had no `obj/project.assets.json` files.
-- This is a workspace restore prerequisite, not a code or merge failure; the feature worktree had already passed the same commands.
-- Next action: restore NuGet assets in the merged main checkout, then rerun unit tests, build, and Windows UI tests.
+- Restored the solution and separate UI-test project from `https://api.nuget.org/v3/index.json`.
+- Merged-main verification then passed: **10 unit tests, 4 Windows UI tests, Release build with 0 warnings and 0 errors**.
+- The original unrelated README/PRD document edits and `.dotnet-home/` remain uncommitted and were intentionally preserved.
 ## Post-merge verification note — 2026-09-23
 
 - The first post-commit full verification exposed an intermittent UI-harness failure: one of four UI cases timed out; the failing case varied between double-click and drag.
