@@ -60,7 +60,9 @@ Not yet verified:
 - tray, startup registration, fullscreen detection, foreground hooks, SQLite, usage statistics, AI, reports, settings persistence, and data deletion;
 - the full PRD acceptance matrix.
 
-The current 6-test suite must not be described as full MVP coverage. The next implementation milestone must add testable interaction controllers before relying on manual UI checks.\n## Current milestone contents
+The current 6-test suite must not be described as full MVP coverage. The next implementation milestone must add testable interaction controllers before relying on manual UI checks.
+
+## Current milestone contents
 
 The current implementation remains offline-only. It intentionally does **not** include:
 
@@ -107,5 +109,4 @@ The Phase 2 focused verification observed 4 passed tests and 0 failures. The ful
 3. Connect `PetPlacementPolicy` to a monitor adapter without moving Win32 calls into the WPF view.
 4. Keep the app offline and runnable while adding the native boundary.
 5. Update this file immediately after each verified milestone.
-
 
