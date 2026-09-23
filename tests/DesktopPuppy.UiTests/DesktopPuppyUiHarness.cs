@@ -179,12 +179,33 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         BringToFront();
         SetCursorPos(start.X, start.Y);
         SendMouseButton(MouseButton.Left, pressed: true);
-        Thread.Sleep(50);
+        WaitForWindowMouseCapture(TimeSpan.FromSeconds(1));
         SetCursorPos(start.X + 20, start.Y);
         Thread.Sleep(100);
         SetCursorPos(end.X, end.Y);
         Thread.Sleep(100);
         SendMouseButton(MouseButton.Left, pressed: false);
+    }
+
+    private void WaitForWindowMouseCapture(TimeSpan timeout)
+    {
+        var threadId = GetWindowThreadProcessId(_windowHandle, out _);
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var info = new GuiThreadInfo
+            {
+                Size = Marshal.SizeOf<GuiThreadInfo>()
+            };
+            if (GetGuiThreadInfo(threadId, ref info) && info.CaptureWindow == _windowHandle)
+            {
+                return;
+            }
+
+            Thread.Sleep(10);
+        }
+
+        throw new TimeoutException("The Desktop Puppy window did not acquire native mouse capture after left-button down.");
     }
 
     public (int X, int Y) GetPetInteractionPoint()
@@ -385,6 +406,23 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         public int Right;
         public int Bottom;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GuiThreadInfo
+    {
+        public int Size;
+        public uint Flags;
+        public IntPtr ActiveWindow;
+        public IntPtr FocusWindow;
+        public IntPtr CaptureWindow;
+        public IntPtr MenuOwnerWindow;
+        public IntPtr MoveSizeWindow;
+        public IntPtr CaretWindow;
+        public NativeWindowRect CaretRect;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetGUIThreadInfo")]
+    private static extern bool GetGuiThreadInfo(uint threadId, ref GuiThreadInfo info);
+
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
 

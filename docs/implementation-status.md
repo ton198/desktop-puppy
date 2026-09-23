@@ -3,7 +3,7 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-23
-**Latest verified step:** Unit tests 10/10, Windows UI tests 4/4, and Release build 0 warnings/0 errors.
+**Latest verified step:** Unit tests 10/10, Windows UI tests 4/4 across 5 consecutive runs, and Release build 0 warnings/0 errors.
 **Current phase:** Phase 3 in progress — interaction controller and desktop UI automation verification
 **Current branch:** `codex/desktop-puppy-foundation`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy`
@@ -122,13 +122,20 @@ The UI test project must be run on an interactive Windows desktop because it lau
 5. Update this file immediately after each verified milestone.
 
 
+## Post-commit verification note — 2026-09-23
+
+- The first post-commit full verification exposed an intermittent UI-harness failure: one of four UI cases timed out; the failing case varied between double-click and drag.
+- Root cause: the harness used fixed sleeps after `SendInput` and could move the pointer before WPF had acquired native mouse capture.
+- [x] Replaced the drag delay with a `GetGUIThreadInfo` condition wait for the pet window's native mouse capture.
+- [x] Corrected the Win32 entry-point mapping to `GetGUIThreadInfo`.
+- [x] Repeated the complete UI suite 5 times after the fix: **20 passed, 0 failed**.
 ## Desktop UI automation verification — 2026-09-23
 
 - [x] Corrected the UI harness P/Invoke mapping to `GetWindowRect`.
 - [x] Confirmed the transparent window must be clicked on the visible pet graphic; the geometric center can hit the underlying desktop window.
 - [x] Confirmed `SpeechBubble` is a WPF `Border` without a UI Automation peer; tests target the visible `SpeechBubbleText` peer and `CloseBubbleButton` instead.
 - [x] Added a small incremental movement to the drag injection so the WPF capture/`DragMove()` path receives a realistic mouse sequence.
-- [x] Verified clean UI automation with diagnostics disabled: **4 passed, 0 failed**.
+- [x] Verified clean UI automation with diagnostics disabled: **4 passed, 0 failed** per run; after stabilizing native mouse capture, 5 consecutive runs also passed (**20/20**).
   - window automation surface and close button;
   - right-click bubble and bubble close;
   - double-click hit response;
