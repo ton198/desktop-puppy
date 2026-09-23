@@ -7,7 +7,7 @@
 **Current phase:** Phase 3 in progress — interaction controller and desktop UI automation verification
 **Current branch:** `codex/desktop-puppy-foundation`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy`
-**Milestone commit:** `e229fe0` — interaction controller and desktop UI automation tests
+**Milestone commit:** `58949d9` — interaction controller and stabilized desktop UI automation tests
 **Base commit:** `c609a5f`
 
 ## Completed
