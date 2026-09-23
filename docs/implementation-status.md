@@ -122,6 +122,11 @@ The UI test project must be run on an interactive Windows desktop because it lau
 5. Update this file immediately after each verified milestone.
 
 
+## Post-merge verification attempt — 2026-09-23
+
+- The first merged-main verification stopped before tests because the original checkout had no `obj/project.assets.json` files.
+- This is a workspace restore prerequisite, not a code or merge failure; the feature worktree had already passed the same commands.
+- Next action: restore NuGet assets in the merged main checkout, then rerun unit tests, build, and Windows UI tests.
 ## Post-merge verification note — 2026-09-23
 
 - The first post-commit full verification exposed an intermittent UI-harness failure: one of four UI cases timed out; the failing case varied between double-click and drag.
