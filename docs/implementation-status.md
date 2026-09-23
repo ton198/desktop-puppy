@@ -3,10 +3,10 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-23
-**Current phase:** Phase 1 complete — WPF skeleton and offline pet
+**Current phase:** Phase 2 complete — core contracts and placement policy
 **Current branch:** `codex/desktop-puppy-foundation`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy`
-**Milestone commit:** first runnable offline pet foundation (branch HEAD after commit)
+**Milestone commit:** core contracts and placement policy (branch HEAD after commit)
 **Base commit:** `c609a5f`
 
 ## Completed
@@ -24,18 +24,17 @@
 - [x] Implemented delayed single-click local lines using the Windows double-click interval.
 - [x] Implemented double-click hit reaction with a one-second local cooldown.
 - [x] Implemented right-click local bubble, bubble close button, drag movement, and a visible exit button.
+- [x] Added `IClock`/`SystemClock` and immutable offline settings defaults.
+- [x] Added pure monitor selection and 20-pixel-visible pet placement clamping.
 - [x] Updated `.gitignore` and `README.md` with the current phase and resume entry point.
-- [x] Verified 2/2 tests pass in Release configuration.
-- [x] Verified Release build succeeds with 0 warnings and 0 errors.
-- [x] Verified the desktop puppy process starts successfully in a startup smoke check.
-- [x] Verified `git diff --check` is clean.
+- [x] Verified the new core/placement tests pass (4 focused tests).
 
 ## Current milestone contents
 
-This milestone is offline-only. It intentionally does **not** include:
+The current implementation remains offline-only. It intentionally does **not** include:
 
 - SQLite or local usage history;
-- Win32 foreground hooks, fullscreen detection, monitor placement, or tray;
+- Win32 foreground hooks, fullscreen detection, native monitor enumeration, or tray;
 - DeepSeek/Jev, API keys, network calls, or AI fallback;
 - real animation assets or continuous animation loops;
 - settings persistence or startup registration.
@@ -53,13 +52,15 @@ $env:DOTNET_CLI_HOME = "C:\Users\ton20\Documents\works\projects\desktop-puppy\.d
 & "C:\Program Files\dotnet\dotnet.exe" run --project src/DesktopPuppy/DesktopPuppy.csproj --configuration Release --no-build
 ```
 
-Observed on 2026-09-23:
+Observed on 2026-09-23 for the previous milestone:
 
 ```text
 Tests: 2 passed, 0 failed
 Release build: 0 warnings, 0 errors
 Startup smoke check: process stayed alive after launch and was then stopped by the verification command
 ```
+
+The Phase 2 focused verification observed 4 passed tests and 0 failures. The full Release verification observed 6 passed tests, 0 warnings, 0 errors, and a successful startup smoke check.
 
 ## Important environment notes
 
@@ -71,8 +72,8 @@ Startup smoke check: process stayed alive after launch and was then stopped by t
 ## Next resume action
 
 1. Read this file and confirm the worktree/branch.
-2. Add the next failing tests for the core clock/settings contracts and pet placement policy.
-3. Implement local settings defaults, an injectable clock, and a pure monitor/work-area placement boundary.
-4. Keep the app offline and runnable while adding those boundaries.
+2. Add the next failing tests for the native window boundary and single-instance policy.
+3. Connect `PetPlacementPolicy` to a monitor adapter without moving Win32 calls into the WPF view.
+4. Keep the app offline and runnable while adding the native boundary.
 5. Update this file immediately after each verified milestone.
 
