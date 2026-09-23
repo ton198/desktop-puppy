@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using DesktopPuppy.Pet.Interaction;
@@ -20,113 +21,152 @@ public partial class PetWindow : Window
         "右键是秘密通道，暂时离线。"
     ];
 
-    private readonly PetInteractionPolicy _interactionPolicy = new(TimeSpan.FromSeconds(1));
-    private readonly DispatcherTimer _singleClickTimer;
+    private readonly DispatcherTimer _interactionTimer;
+    private readonly InteractionController _interactionController;
     private int _lineIndex;
-    private Point _mouseDownPoint;
-    private bool _pendingSingleClick;
     private bool _dragStarted;
 
     public PetWindow()
     {
         InitializeComponent();
 
-        _singleClickTimer = new DispatcherTimer
+        _interactionController = new InteractionController(
+            new PetInteractionPolicy(TimeSpan.FromSeconds(1)),
+            TimeSpan.FromMilliseconds(GetDoubleClickTime()),
+            dragThreshold: 8,
+            OnInteractionEvent);
+
+        _interactionTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(GetDoubleClickTime())
+            Interval = TimeSpan.FromMilliseconds(16)
         };
-        _singleClickTimer.Tick += SingleClickTimer_OnTick;
+        _interactionTimer.Tick += InteractionTimer_OnTick;
     }
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        _singleClickTimer.Stop();
+        _interactionTimer.Stop();
         base.OnClosing(e);
     }
 
     private void PetWindow_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _mouseDownPoint = e.GetPosition(this);
-        _dragStarted = false;
-
-        if (e.ClickCount >= 2)
+        if (e.OriginalSource is Button)
         {
-            _singleClickTimer.Stop();
-            _pendingSingleClick = false;
-            RegisterHit();
-            e.Handled = true;
             return;
         }
 
-        _pendingSingleClick = true;
-        _singleClickTimer.Stop();
-        _singleClickTimer.Start();
-        CaptureMouse();
+        var now = DateTimeOffset.Now;
+        _interactionController.PointerPressed(
+            new PointerPoint(e.GetPosition(this).X, e.GetPosition(this).Y),
+            now,
+            e.ClickCount);
+        SyncInteractionTimer();
+
+        if (e.ClickCount == 1)
+        {
+            CaptureMouse();
+        }
     }
 
     private void PetWindow_OnMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_pendingSingleClick || e.LeftButton != MouseButtonState.Pressed || _dragStarted)
+        if (e.OriginalSource is Button)
         {
             return;
         }
 
-        var currentPoint = e.GetPosition(this);
-        var delta = currentPoint - _mouseDownPoint;
-        if (Math.Abs(delta.X) < SystemParameters.MinimumHorizontalDragDistance &&
-            Math.Abs(delta.Y) < SystemParameters.MinimumVerticalDragDistance)
+        var point = e.GetPosition(this);
+        _interactionController.PointerMoved(
+            new PointerPoint(point.X, point.Y),
+            DateTimeOffset.Now,
+            e.LeftButton == MouseButtonState.Pressed);
+        SyncInteractionTimer();
+    }
+
+    private void PetWindow_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is Button)
         {
             return;
         }
 
-        _singleClickTimer.Stop();
-        _pendingSingleClick = false;
-        _dragStarted = true;
-        ReleaseMouseCapture();
+        var point = e.GetPosition(this);
+        _interactionController.PointerReleased(
+            new PointerPoint(point.X, point.Y),
+            DateTimeOffset.Now);
+        SyncInteractionTimer();
+        if (!_dragStarted)
+        {
+            ReleaseMouseCapture();
+        }
 
-        try
-        {
-            DragMove();
-        }
-        catch (InvalidOperationException)
-        {
-            // The window may close while a drag is being initiated.
-        }
+        _dragStarted = false;
     }
 
     private void PetWindow_OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        ShowBubble(LocalLines[^1]);
-        e.Handled = true;
-    }
-
-    private void PetWindow_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
-    {
-        _singleClickTimer.Stop();
-        _pendingSingleClick = false;
-        RegisterHit();
-        e.Handled = true;
-    }
-
-    private void SingleClickTimer_OnTick(object? sender, EventArgs e)
-    {
-        _singleClickTimer.Stop();
-        if (!_pendingSingleClick || _dragStarted)
+        if (e.OriginalSource is Button)
         {
             return;
         }
 
-        _pendingSingleClick = false;
-        ReleaseMouseCapture();
-        ShowBubble(LocalLines[_lineIndex++ % LocalLines.Length]);
+        _interactionController.RightClicked(
+            DateTimeOffset.Now,
+            new PointerPoint(e.GetPosition(this).X, e.GetPosition(this).Y));
+        e.Handled = true;
     }
 
-    private void RegisterHit()
+    private void InteractionTimer_OnTick(object? sender, EventArgs e)
     {
-        ReleaseMouseCapture();
-        if (_interactionPolicy.TryRegisterHit(DateTimeOffset.Now))
+        _interactionController.Advance(DateTimeOffset.Now);
+        SyncInteractionTimer();
+    }
+
+    private void OnInteractionEvent(PetInteractionEvent interactionEvent)
+    {
+        switch (interactionEvent.Type)
         {
-            ShowBubble("嗷！轻点，我还在离线模式里努力。");
+            case PetInteractionEventType.SingleClick:
+                ShowBubble(LocalLines[_lineIndex++ % LocalLines.Length]);
+                break;
+            case PetInteractionEventType.Hit:
+                ShowBubble("嗷！轻点，我还在离线模式里努力。");
+                break;
+            case PetInteractionEventType.RightClick:
+                ShowBubble(LocalLines[^1]);
+                break;
+            case PetInteractionEventType.DragStarted:
+                _dragStarted = true;
+                _interactionTimer.Stop();
+                ReleaseMouseCapture();
+                try
+                {
+                    DragMove();
+                }
+                catch (InvalidOperationException)
+                {
+                    // The window may close while a drag is being initiated.
+                }
+                break;
+            case PetInteractionEventType.DragCompleted:
+                _dragStarted = false;
+                break;
+        }
+    }
+
+    private void SyncInteractionTimer()
+    {
+        if (_interactionController.HasPendingSingleClick)
+        {
+            if (!_interactionTimer.IsEnabled)
+            {
+                _interactionTimer.Start();
+            }
+        }
+        else
+        {
+            _interactionTimer.Stop();
         }
     }
 

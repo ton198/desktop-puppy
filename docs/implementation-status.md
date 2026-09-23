@@ -3,10 +3,11 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-23
-**Current phase:** Phase 2 complete — core contracts and placement policy
+**Latest verified step:** Unit tests 10/10, Windows UI tests 4/4, and Release build 0 warnings/0 errors.
+**Current phase:** Phase 3 in progress — interaction controller and desktop UI automation verification
 **Current branch:** `codex/desktop-puppy-foundation`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy`
-**Milestone commit:** core contracts and placement policy (branch HEAD after commit)
+**Milestone commit:** pending commit for interaction controller and UI automation tests
 **Base commit:** `c609a5f`
 
 ## Completed
@@ -32,35 +33,43 @@
 
 ## Test coverage audit — 2026-09-23
 
-Current automated test count: **6 passed, 0 failed**.
+Current automated test count: **10 unit tests passed, 0 failed; 4 Windows UI tests passed, 0 failed**.
 
-Covered:
+Covered by unit tests:
 
 - `ApplicationInfo.ProductName` smoke contract;
 - hit cooldown policy;
 - default settings policy;
 - injectable clock contract;
 - pet position clamping with a minimum visible edge;
-- missing-monitor fallback to the primary monitor.
+- missing-monitor fallback to the primary monitor;
+- delayed single-click emission;
+- double-click cancellation and hit emission;
+- drag start/completion with click suppression;
+- right-click event emission.
+
+Covered by the separate Windows UI test project:
+
+- visible WPF window and close button through UI Automation;
+- right-click speech bubble and bubble close;
+- double-click hit response;
+- drag movement without closing the pet.
 
 Verified outside unit tests:
 
-- Release compilation with 0 warnings and 0 errors;
-- application process starts and remains alive during a short startup smoke check;
+- Release solution compilation with 0 warnings and 0 errors;
+- clean Windows UI automation run with 4 passed and 0 failed;
+- application process starts and remains alive during the earlier startup smoke check;
 - `git diff --check` is clean.
 
 Not yet verified:
 
-- single-click delay versus double-click cancellation;
-- drag behavior and click suppression during drag;
-- right-click bubble display and bubble close button;
-- exit button behavior;
 - actual WPF transparency, topmost behavior, DPI scaling, multi-monitor movement, and monitor removal;
 - single-instance behavior;
 - tray, startup registration, fullscreen detection, foreground hooks, SQLite, usage statistics, AI, reports, settings persistence, and data deletion;
 - the full PRD acceptance matrix.
 
-The current 6-test suite must not be described as full MVP coverage. The next implementation milestone must add testable interaction controllers before relying on manual UI checks.
+The 14 automated tests cover the current offline interaction milestone only; they must not be described as full MVP or full PRD coverage.
 
 ## Current milestone contents
 
@@ -82,18 +91,20 @@ Run from the worktree with .NET 10 SDK:
 $env:DOTNET_CLI_HOME = "C:\Users\ton20\Documents\works\projects\desktop-puppy\.dotnet-home"
 & "C:\Program Files\dotnet\dotnet.exe" test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release
 & "C:\Program Files\dotnet\dotnet.exe" build DesktopPuppy.sln --configuration Release --no-restore
+$env:DESKTOP_PUPPY_EXE = "C:\Users\ton20\.codex\worktrees\desktop-puppy-foundation\desktop-puppy\src\DesktopPuppy\bin\Release\net10.0-windows\DesktopPuppy.exe"
+& "C:\Program Files\dotnet\dotnet.exe" test tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release --no-restore --filter "Category=Ui"
 & "C:\Program Files\dotnet\dotnet.exe" run --project src/DesktopPuppy/DesktopPuppy.csproj --configuration Release --no-build
 ```
 
-Observed on 2026-09-23 for the previous milestone:
+Observed on 2026-09-23 for the current milestone:
 
 ```text
-Tests: 2 passed, 0 failed
+Unit tests: 10 passed, 0 failed
+Windows UI tests: 4 passed, 0 failed
 Release build: 0 warnings, 0 errors
-Startup smoke check: process stayed alive after launch and was then stopped by the verification command
 ```
 
-The Phase 2 focused verification observed 4 passed tests and 0 failures. The full Release verification observed 6 passed tests, 0 warnings, 0 errors, and a successful startup smoke check.
+The UI test project must be run on an interactive Windows desktop because it launches and controls a real WPF process. The current milestone is verified, but the broader PRD acceptance matrix remains incomplete.
 
 ## Important environment notes
 
@@ -111,6 +122,18 @@ The Phase 2 focused verification observed 4 passed tests and 0 failures. The ful
 5. Update this file immediately after each verified milestone.
 
 
+## Desktop UI automation verification — 2026-09-23
+
+- [x] Corrected the UI harness P/Invoke mapping to `GetWindowRect`.
+- [x] Confirmed the transparent window must be clicked on the visible pet graphic; the geometric center can hit the underlying desktop window.
+- [x] Confirmed `SpeechBubble` is a WPF `Border` without a UI Automation peer; tests target the visible `SpeechBubbleText` peer and `CloseBubbleButton` instead.
+- [x] Added a small incremental movement to the drag injection so the WPF capture/`DragMove()` path receives a realistic mouse sequence.
+- [x] Verified clean UI automation with diagnostics disabled: **4 passed, 0 failed**.
+  - window automation surface and close button;
+  - right-click bubble and bubble close;
+  - double-click hit response;
+  - drag movement without closing the pet.
+- [ ] The UI test project remains intentionally separate from the default unit-test run because it launches a real desktop process and requires an interactive Windows desktop.
 ## Desktop automation diagnosis — 2026-09-23
 
 Root cause investigation result: the WPF application does create a real visible top-level window, and Windows UI Automation can see it. The current failure is in the discovery/binding path used by the available CUA wrapper, plus the absence of a UI automation test harness in the xUnit project.
