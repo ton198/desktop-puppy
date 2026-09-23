@@ -110,3 +110,32 @@ The Phase 2 focused verification observed 4 passed tests and 0 failures. The ful
 4. Keep the app offline and runnable while adding the native boundary.
 5. Update this file immediately after each verified milestone.
 
+
+## Desktop automation diagnosis — 2026-09-23
+
+Root cause investigation result: the WPF application does create a real visible top-level window, and Windows UI Automation can see it. The current failure is in the discovery/binding path used by the available CUA wrapper, plus the absence of a UI automation test harness in the xUnit project.
+
+Evidence:
+
+- A running `DesktopPuppy` process was found.
+- `Get-Process` reported `MainWindowHandle=0` and an empty `MainWindowTitle`, so PowerShell's main-window heuristic does not identify the WPF pet window.
+- Native `EnumWindows` found a visible top-level window titled `Desktop Puppy` for the same process.
+- Windows UI Automation resolved that HWND as `ControlType.Window`, `Name=Desktop Puppy`, `IsOffscreen=False`.
+- Windows UI Automation found one visible button with `Name=×` and `AutomationId=CloseButton`.
+- The current CUA runtime returned no app inventory entry and its runtime object did not expose the documented `listWindows` or `getApp` methods, so it could not bind to the known HWND through the current wrapper.
+
+Contributing factors in the current production window:
+
+- `AllowsTransparency=True`;
+- `WindowStyle=None`;
+- `ShowInTaskbar=False`;
+- `Topmost=True`.
+
+These are appropriate for a desktop pet but make taskbar/process-based discovery less reliable. They are not evidence that the window is absent: native enumeration and UI Automation both found it.
+
+Next testability work:
+
+1. Add a separate Windows UI Automation integration harness that enumerates the pet window by process/title or an explicit test handle, instead of relying only on the CUA app inventory.
+2. Add `AutomationProperties.AutomationId`/`Name` to the pet surface, bubble, bubble-close button, and interaction state so UI tests can target stable elements.
+3. Keep pure interaction-controller tests in xUnit and use UI Automation only for window creation, hit-test routing, drag/click smoke checks, and close behavior.
+4. Consider an `--automation` launch mode only if the harness cannot interact reliably with the transparent production window; do not weaken normal production window behavior just to satisfy discovery.
