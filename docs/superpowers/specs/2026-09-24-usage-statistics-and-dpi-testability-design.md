@@ -183,7 +183,7 @@ Each proposed test states its purpose, the inputs/behavior it covers, and the ex
 #### D-04 — `Coordinate_round_trip_preserves_fractional_geometry`
 - **Purpose:** Prevent systematic position/size drift after repeated conversions.
 - **Coverage:** Round-trip representative fractional values at scales 1.25, 1.5, and 2.0.
-- **Target effect:** The recovered values equal the originals within the documented floating-point tolerance; rounding occurs only at the native integer boundary, not in the pure policy.
+- **Target effect:** The recovered values differ from the originals by no more than 1e-9 DIPs; rounding occurs only at the native integer boundary, not in the pure policy.
 
 #### D-05 — `Negative_origin_secondary_monitor_remains_selectable_and_clampable`
 - **Purpose:** Protect multi-monitor layouts where a monitor lies left of or above the primary display.
@@ -193,12 +193,12 @@ Each proposed test states its purpose, the inputs/behavior it covers, and the ex
 #### D-06 — `Visible_edge_margin_is_twenty_physical_pixels_at_one_hundred_fifty_percent_scale`
 - **Purpose:** Preserve the user-visible edge invariant when policy geometry is expressed in DIPs.
 - **Coverage:** At scale 1.5, convert a 20-device-pixel minimum edge to its logical equivalent and clamp the pet at each work-area edge.
-- **Target effect:** The resulting visible portion is at least 20 physical pixels on every tested edge, subject only to the documented tolerance; using 20 DIPs directly must not accidentally produce a 30-pixel requirement.
+- **Target effect:** The resulting visible portion is at least 20 physical pixels on every tested edge within 1e-9 pixels in the pure-double policy; integer rounding is deferred to the native boundary. Using 20 DIPs directly must not accidentally produce a 30-pixel requirement.
 
 #### D-07 — `Same_physical_visible_margin_is_independent_of_monitor_scale`
 - **Purpose:** Ensure moving the pet between displays does not change the physical edge visibility requirement.
 - **Coverage:** Apply the same 20-device-pixel margin at scale 1.0 and 1.5.
-- **Target effect:** The logical margins differ by scale, but both clamp results expose 20 physical pixels.
+- **Target effect:** The logical margins differ by scale, but both clamp results expose 20 physical pixels within 1e-9 pixels.
 
 Existing tests for a missing saved monitor falling back to the primary monitor and for the default 20-unit visible edge remain regression tests; they are not duplicated by the new DPI tests.
 
@@ -233,3 +233,4 @@ Existing tests for a missing saved monitor falling back to the primary monitor a
 - Unit tests pass, and the Release solution build completes with no warnings/errors.
 - Existing Windows UI tests remain separate and pass on an interactive Windows desktop.
 - Documentation distinguishes pure unit coverage from Windows integration verification.
+
