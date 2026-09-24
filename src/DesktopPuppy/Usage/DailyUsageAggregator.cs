@@ -84,7 +84,7 @@ public static class DailyUsageAggregator
             var localCursor = TimeZoneInfo.ConvertTime(cursor, timeZone);
             var localDate = DateOnly.FromDateTime(localCursor.DateTime);
             var nextLocalMidnight = localDate.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-            var nextBoundaryUtc = ResolveLocalMidnight(nextLocalMidnight, timeZone);
+            var nextBoundaryUtc = LocalDayBoundaryPolicy.StartOfDateUtc(localDate.AddDays(1), timeZone);
             var segmentEnd = nextBoundaryUtc > cursor && nextBoundaryUtc < endUtc
                 ? nextBoundaryUtc
                 : endUtc;
@@ -92,21 +92,5 @@ public static class DailyUsageAggregator
             addDuration(localDate, segmentEnd - cursor);
             cursor = segmentEnd;
         }
-    }
-
-    private static DateTimeOffset ResolveLocalMidnight(DateTime localMidnight, TimeZoneInfo timeZone)
-    {
-        while (timeZone.IsInvalidTime(localMidnight))
-        {
-            localMidnight = localMidnight.AddMinutes(1);
-        }
-
-        if (timeZone.IsAmbiguousTime(localMidnight))
-        {
-            var earliestOffset = timeZone.GetAmbiguousTimeOffsets(localMidnight).Max();
-            return new DateTimeOffset(localMidnight, earliestOffset).ToUniversalTime();
-        }
-
-        return new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localMidnight, timeZone));
     }
 }

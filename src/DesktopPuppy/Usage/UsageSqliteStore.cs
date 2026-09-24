@@ -145,6 +145,20 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
         command.ExecuteNonQuery();
     }
 
+    public void PruneBefore(DateTimeOffset cutoffUtc)
+    {
+        ThrowIfDisposed();
+        EnsureInitialized();
+
+        var cutoff = FormatInstant(cutoffUtc);
+        using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        ExecuteRetentionCommand(connection, transaction, "DELETE FROM usage_sessions WHERE ended_at_utc <= $cutoff;", cutoff);
+        ExecuteRetentionCommand(connection, transaction, "UPDATE usage_sessions SET started_at_utc = $cutoff WHERE started_at_utc < $cutoff AND ended_at_utc > $cutoff;", cutoff);
+        ExecuteRetentionCommand(connection, transaction, "DELETE FROM window_title_intervals WHERE ended_at_utc IS NOT NULL AND ended_at_utc <= $cutoff;", cutoff);
+        ExecuteRetentionCommand(connection, transaction, "UPDATE window_title_intervals SET started_at_utc = $cutoff WHERE started_at_utc < $cutoff AND (ended_at_utc IS NULL OR ended_at_utc > $cutoff);", cutoff);
+        transaction.Commit();
+    }
     public IReadOnlyList<ForegroundSession> ReadSessions()
     {
         ThrowIfDisposed();
@@ -216,6 +230,18 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
         _disposed = true;
     }
 
+    private static void ExecuteRetentionCommand(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string commandText,
+        string cutoff)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+        command.Parameters.AddWithValue("$cutoff", cutoff);
+        command.ExecuteNonQuery();
+    }
     private SqliteConnection OpenConnection()
     {
         var connection = new SqliteConnection($"Data Source={_databasePath};Pooling=False");
@@ -252,6 +278,3 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
             DateTimeStyles.RoundtripKind).ToUniversalTime();
     }
 }
-
-
-
