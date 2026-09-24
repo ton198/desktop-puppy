@@ -194,6 +194,3 @@ public sealed class DailyUsageAggregatorTests
         return new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.Zero);
     }
 }
-
-
-

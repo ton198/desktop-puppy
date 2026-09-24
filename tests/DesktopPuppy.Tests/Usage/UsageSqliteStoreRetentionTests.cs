@@ -222,5 +222,3 @@ public sealed class UsageSqliteStoreRetentionTests : IDisposable
         return new DateTimeOffset(year, month, day, hour, minute, 0, TimeSpan.Zero);
     }
 }
-
-
