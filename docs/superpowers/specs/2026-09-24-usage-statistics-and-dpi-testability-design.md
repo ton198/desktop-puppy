@@ -233,4 +233,3 @@ Existing tests for a missing saved monitor falling back to the primary monitor a
 - Unit tests pass, and the Release solution build completes with no warnings/errors.
 - Existing Windows UI tests remain separate and pass on an interactive Windows desktop.
 - Documentation distinguishes pure unit coverage from Windows integration verification.
-
