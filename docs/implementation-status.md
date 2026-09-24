@@ -2,9 +2,9 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-23
-**Latest verified step:** Foreground usage vertical slice passes 33 unit tests, 4 Windows UI tests, and Release build with 0 warnings/0 errors.
-**Current phase:** Phase 4 in progress — foreground usage collection and local persistence
+**Last updated:** 2026-09-24
+**Latest verified step:** Usage/DPI core expansion passes 69 unit tests, 4 Windows UI tests, and Release build with 0 warnings/0 errors.
+**Current phase:** Phase 4 in progress — foreground collection, local-day aggregation, retention policy, and DPI geometry core
 **Current branch:** `codex/foreground-usage-slice`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\foreground-usage-slice\desktop-puppy`
 **Milestone commit:** `a8634e8` (`feat: wire single-instance startup`)
@@ -32,7 +32,7 @@
 - [x] Wired usage tracking into `App` startup/shutdown; title advancement runs on a background `System.Threading.Timer`, not the WPF Dispatcher.
 - [x] Pinned `SQLitePCLRaw.lib.e_sqlite3` to `2.1.13`; the application vulnerability scan reports no vulnerable packages.
 
-## Test coverage audit — 2026-09-23
+## Historical test coverage audit — 2026-09-23
 
 Current automated test count: **33 unit tests passed, 0 failed; 4 Windows UI tests passed, 0 failed**.
 
@@ -205,3 +205,30 @@ This slice proves the local usage path, but it is not the complete statistics su
 2. Add daily aggregation and local-day splitting on top of persisted sessions and title intervals.
 3. Add 15-day retention while preserving settings and future encrypted API-key storage.
 4. Add monitor/DPI/fullscreen adapters without moving native calls into WPF views.
+## Current checkpoint — 2026-09-24
+
+The testable usage-statistics and DPI core slice is implemented on `codex/foreground-usage-slice`.
+
+- Added 8 session/power event-router tests for normalized lock, suspend, hibernate, shutdown, unlock/resume behavior, unknown events, and repeated boundaries. These do **not** exercise native Windows notification delivery.
+- Added 9 daily-aggregation tests for same-day usage, local-midnight splitting, exact-midnight ends, injected timezone, process totals, title detail, open intervals capped by `asOfUtc`, and Eastern spring/fall DST transitions.
+- Added 10 SQLite retention tests for the 15-local-date cutoff, exact cutoff inclusion, deleting expired rows, clipping crossing intervals, preserving open titles, idempotency, unrelated tables, DST calendar arithmetic, and UTC round-trips.
+- Added 9 executed DPI/placement test cases (including the three scale rows in one round-trip theory) for conversion, precision, negative-origin secondary monitors, and preserving a 20-physical-pixel edge across scales.
+- Existing 33 unit tests remain green: **69 unit tests passed, 0 failed**.
+
+Fresh verification on 2026-09-24:
+
+```text
+Unit tests: 69 passed, 0 failed
+Windows UI tests: 4 passed, 0 failed
+Release solution build: 0 warnings, 0 errors
+```
+
+The Windows UI suite verifies the existing WPF interaction/startup behavior only. Still required before claiming complete system integration:
+
+1. Implement and connect the native Windows lock/sleep/hibernate/resume notification source to `SessionPowerEventRouter` / `UsageCollector`.
+2. Invoke and schedule the 15-local-date cleanup from application runtime; `UsageSqliteStore.PruneBefore` currently exists but is not called by `App`.
+3. Connect daily aggregation to a report/statistics consumer.
+4. Connect DPI conversion to native monitor work-area enumeration and the real WPF placement path; test mixed-DPI monitor transitions and monitor removal on Windows.
+5. Verify two-process single-instance activation with a dedicated Windows integration check.
+
+These 69 tests cover the current interaction, foreground-usage, aggregation, retention-store, and pure geometry core; they are not full MVP/PRD acceptance coverage.

@@ -41,11 +41,11 @@
 
 **Test:** `tests/DesktopPuppy.Tests/Usage/SessionPowerEventRouterTests.cs`
 
-- [ ] **Step 1: Write A-01 and observe RED.** Instantiate a router with a list-capturing callback; send `Locked` at a fixed timestamp; assert the sole callback is `(SessionBoundary.Lock, timestamp)`. Run: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release --filter "FullyQualifiedName~Locked_event_routes_lock_boundary_at_event_time"`. Expected: fails because the router contract does not yet exist.
-- [ ] **Step 2: Implement the minimum router contract.** Add the enum/class and only the `Locked` mapping required by A-01. Do not add Win32 registration.
-- [ ] **Step 3: Run A-01 GREEN, then add A-02 through A-08 individually.** Use the exact inputs and outcomes in spec cases A-02..A-08: suspend maps to Sleep; hibernate remains distinct; shutdown maps to Shutdown; unlock does not reopen; resume waits for an explicit foreground snapshot; unknown values are ignored; duplicate close notifications do not duplicate the closed-session callback.
-- [ ] **Step 4: For each added case, run its focused filter and observe the expected failure before changing mapping/state behavior; then rerun the case to PASS.** Use test-name fragments from the spec. Run all router tests afterward: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release --filter "FullyQualifiedName~SessionPowerEventRouterTests"`.
-- [ ] **Step 5: Run all unit tests and commit.** Run the full unit-test project. Commit only router source and its test file with message `feat: add testable session event routing`.
+- [x] **Step 1: Write A-01 and observe RED.** Instantiate a router with a list-capturing callback; send `Locked` at a fixed timestamp; assert the sole callback is `(SessionBoundary.Lock, timestamp)`. Run: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release --filter "FullyQualifiedName~Locked_event_routes_lock_boundary_at_event_time"`. Expected: fails because the router contract does not yet exist.
+- [x] **Step 2: Implement the minimum router contract.** Add the enum/class and only the `Locked` mapping required by A-01. Do not add Win32 registration.
+- [x] **Step 3: Run A-01 GREEN, then add A-02 through A-08 individually.** Use the exact inputs and outcomes in spec cases A-02..A-08: suspend maps to Sleep; hibernate remains distinct; shutdown maps to Shutdown; unlock does not reopen; resume waits for an explicit foreground snapshot; unknown values are ignored; duplicate close notifications do not duplicate the closed-session callback.
+- [x] **Step 4: For each added case, run its focused filter and observe the expected failure before changing mapping/state behavior; then rerun the case to PASS.** Use test-name fragments from the spec. Run all router tests afterward: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release --filter "FullyQualifiedName~SessionPowerEventRouterTests"`.
+- [x] **Step 5: Run all unit tests and commit.** Run the full unit-test project. Commit only router source and its test file with message `feat: add testable session event routing`.
 
 ## Task 2: Aggregate Usage by Local Day
 
@@ -53,12 +53,12 @@
 
 **Test:** `tests/DesktopPuppy.Tests/Usage/DailyUsageAggregatorTests.cs`
 
-- [ ] **Step 1: Write B-01 and observe RED.** Construct one session from 09:00 to 10:30 UTC; aggregate with `TimeZoneInfo.Utc`; assert one process/date bucket equals 90 minutes. Focused filter: `FullyQualifiedName~Same_day_session_contributes_full_duration_to_one_local_day`. Expected: missing aggregator/result contract.
-- [ ] **Step 2: Implement the minimal same-day aggregation.** Add immutable result records and sum closed session intervals without database or clock access.
-- [ ] **Step 3: Add and cycle B-02 through B-05.** Test 23:30-00:30 split (30/30), exact-midnight end (no zero bucket), negative-offset local-date selection, and summing two same-process sessions without merging a second process. For each case, run its focused filter and verify the pre-fix failure, then implement only the missing behavior.
-- [ ] **Step 4: Add and cycle B-06 through B-07.** Split title detail by local date/title; cap an open interval at explicit `asOfUtc`. Assert repeated calls with identical inputs are identical and no future duration appears.
-- [ ] **Step 5: Add and cycle B-08 through B-09.** Use the `Eastern Standard Time` zone and exact UTC instants from the spec. Assert 60 minutes on 2026-03-08 across the spring gap and 120 minutes on 2026-11-01 across the repeated fall hour.
-- [ ] **Step 6: Run the complete aggregator class, then all unit tests.** Ensure the sum of split buckets equals elapsed UTC input duration and no empty bucket is returned. Commit source/tests as `feat: add local-day usage aggregation`.
+- [x] **Step 1: Write B-01 and observe RED.** Construct one session from 09:00 to 10:30 UTC; aggregate with `TimeZoneInfo.Utc`; assert one process/date bucket equals 90 minutes. Focused filter: `FullyQualifiedName~Same_day_session_contributes_full_duration_to_one_local_day`. Expected: missing aggregator/result contract.
+- [x] **Step 2: Implement the minimal same-day aggregation.** Add immutable result records and sum closed session intervals without database or clock access.
+- [x] **Step 3: Add and cycle B-02 through B-05.** Test 23:30-00:30 split (30/30), exact-midnight end (no zero bucket), negative-offset local-date selection, and summing two same-process sessions without merging a second process. For each case, run its focused filter and verify the pre-fix failure, then implement only the missing behavior.
+- [x] **Step 4: Add and cycle B-06 through B-07.** Split title detail by local date/title; cap an open interval at explicit `asOfUtc`. Assert repeated calls with identical inputs are identical and no future duration appears.
+- [x] **Step 5: Add and cycle B-08 through B-09.** Use the `Eastern Standard Time` zone and exact UTC instants from the spec. Assert 60 minutes on 2026-03-08 across the spring gap and 120 minutes on 2026-11-01 across the repeated fall hour.
+- [x] **Step 6: Run the complete aggregator class, then all unit tests.** Ensure the sum of split buckets equals elapsed UTC input duration and no empty bucket is returned. Commit source/tests as `feat: add local-day usage aggregation`.
 
 ## Task 3: Enforce Fifteen Local Dates of SQLite History
 
@@ -66,11 +66,11 @@
 
 **Test:** `tests/DesktopPuppy.Tests/Usage/UsageSqliteStoreRetentionTests.cs`
 
-- [ ] **Step 1: Write C-01 and observe RED.** Fix `nowUtc` and a time zone; assert cutoff is midnight for the oldest of 15 local dates, converted to UTC. Run the focused filter. Expected: missing policy method.
-- [ ] **Step 2: Implement cutoff policy and run C-01 GREEN.** Do not subtract a fixed 360 hours.
-- [ ] **Step 3: Add and cycle C-02 through C-06 against a temporary SQLite database.** Seed exact-cutoff/expired/retained sessions and closed/open title intervals. Assert wholly expired rows are deleted, start-at-cutoff rows remain, crossing rows keep identity/details and are clipped, and an open title remains open. Verify every test against actual store reads, not mocked SQL calls.
-- [ ] **Step 4: Add and cycle C-07 through C-10.** Run cleanup twice and compare reads; add a sentinel unrelated table and preserve it; calculate across the spring DST date using local-calendar arithmetic; clip with a non-UTC local zone and assert read-back instants are unchanged UTC instants.
-- [ ] **Step 5: Run all retention and existing store tests, then all unit tests.** Commit source/tests as `feat: retain fifteen local days of usage history`.
+- [x] **Step 1: Write C-01 and observe RED.** Fix `nowUtc` and a time zone; assert cutoff is midnight for the oldest of 15 local dates, converted to UTC. Run the focused filter. Expected: missing policy method.
+- [x] **Step 2: Implement cutoff policy and run C-01 GREEN.** Do not subtract a fixed 360 hours.
+- [x] **Step 3: Add and cycle C-02 through C-06 against a temporary SQLite database.** Seed exact-cutoff/expired/retained sessions and closed/open title intervals. Assert wholly expired rows are deleted, start-at-cutoff rows remain, crossing rows keep identity/details and are clipped, and an open title remains open. Verify every test against actual store reads, not mocked SQL calls.
+- [x] **Step 4: Add and cycle C-07 through C-10.** Run cleanup twice and compare reads; add a sentinel unrelated table and preserve it; calculate across the spring DST date using local-calendar arithmetic; clip with a non-UTC local zone and assert read-back instants are unchanged UTC instants.
+- [x] **Step 5: Run all retention and existing store tests, then all unit tests.** Commit source/tests as `feat: retain fifteen local days of usage history`.
 
 ## Task 4: Add Pure DPI Geometry Conversion Coverage
 
@@ -78,20 +78,20 @@
 
 **Tests:** `tests/DesktopPuppy.Tests/Pet/DpiGeometryPolicyTests.cs`, plus `PetPlacementPolicyTests.cs` for D-05.
 
-- [ ] **Step 1: Write D-01 and observe RED.** Assert conversion at scale 1.0 is identity. Run its focused filter; expected: missing pure policy.
-- [ ] **Step 2: Implement identity conversion and run D-01 GREEN.**
-- [ ] **Step 3: Add and cycle D-02 through D-04.** Verify 80 DIPs × 1.25 = 100 device pixels, 300 device pixels ÷ 1.5 = 200 DIPs, and round trips at 1.25/1.5/2.0 differ by no more than `1e-9` DIPs. Run focused filters before and after each conversion change.
-- [ ] **Step 4: Add D-05 to placement tests.** Select a saved secondary monitor with negative origin, clamp in consistent units, and assert the expected negative-coordinate result while preserving the visible-edge invariant.
-- [ ] **Step 5: Add and cycle D-06 and D-07.** Convert a 20-device-pixel margin to DIPs at 1.0 and 1.5 scales, clamp on all edges, and assert the physical visible amount is 20 pixels within `1e-9`; test that 20 DIPs at 1.5 is not mistaken for 20 physical pixels.
-- [ ] **Step 6: Run both placement test classes and the full unit suite.** Commit source/tests as `feat: add pure dpi geometry policy`.
+- [x] **Step 1: Write D-01 and observe RED.** Assert conversion at scale 1.0 is identity. Run its focused filter; expected: missing pure policy.
+- [x] **Step 2: Implement identity conversion and run D-01 GREEN.**
+- [x] **Step 3: Add and cycle D-02 through D-04.** Verify 80 DIPs × 1.25 = 100 device pixels, 300 device pixels ÷ 1.5 = 200 DIPs, and round trips at 1.25/1.5/2.0 differ by no more than `1e-9` DIPs. Run focused filters before and after each conversion change.
+- [x] **Step 4: Add D-05 to placement tests.** Select a saved secondary monitor with negative origin, clamp in consistent units, and assert the expected negative-coordinate result while preserving the visible-edge invariant.
+- [x] **Step 5: Add and cycle D-06 and D-07.** Convert a 20-device-pixel margin to DIPs at 1.0 and 1.5 scales, clamp on all edges, and assert the physical visible amount is 20 pixels within `1e-9`; test that 20 DIPs at 1.5 is not mistaken for 20 physical pixels.
+- [x] **Step 6: Run both placement test classes and the full unit suite.** Commit source/tests as `feat: add pure dpi geometry policy`.
 
 ## Task 5: Document Coverage and Verify Integration Boundaries
 
 **Files:** `docs/implementation-status.md`.
 
-- [ ] **Step 1: Update the unit-test inventory.** Record new test count, categories, and which behaviors remain outside unit scope; explicitly retain real session/power message delivery and real mixed-DPI WPF movement under Windows integration/manual verification.
-- [ ] **Step 2: Run final verification.** Run the complete unit project in Release, build `DesktopPuppy.sln` in Release with `--no-restore`, run the separate Windows UI suite if the interactive desktop is available, and run `git diff --check`.
-- [ ] **Step 3: Review repository diff and commit the status update.** Confirm no files in the main checkout changed. Commit documentation as `docs: record usage and dpi test coverage`.
+- [x] **Step 1: Update the unit-test inventory.** Record new test count, categories, and which behaviors remain outside unit scope; explicitly retain real session/power message delivery and real mixed-DPI WPF movement under Windows integration/manual verification.
+- [x] **Step 2: Run final verification.** Run the complete unit project in Release, build `DesktopPuppy.sln` in Release with `--no-restore`, run the separate Windows UI suite if the interactive desktop is available, and run `git diff --check`.
+- [x] **Step 3: Review repository diff and commit the status update.** Confirm no files in the main checkout changed. Commit documentation as `docs: record usage and dpi test coverage`.
 
 ## Commands
 
