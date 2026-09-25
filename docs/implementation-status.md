@@ -2,12 +2,12 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-24
-**Latest verified step:** Windows session/power event source and resume refresh are integrated; 79 unit tests, 4 Windows UI tests, and Release build pass (0 warnings/0 errors).
+**Last updated:** 2026-09-25
+**Latest verified step:** Merged the Windows session/power integration and lock-screen Hook suppression to `main` (`cca4eb1`); 79 unit tests and 4 Windows UI tests pass, and Release build has 0 warnings / 0 errors. The initial UI-suite run had one window-discovery timeout; the isolated test and a complete rerun both passed.
 **Current phase:** Phase 4 in progress — foreground collection, session/power notification wiring, local-day aggregation, retention policy, and DPI geometry core
-**Current branch:** `codex/foreground-usage-slice`
-**Worktree:** `C:\Users\ton20\.codex\worktrees\foreground-usage-slice\desktop-puppy`
-**Milestone commit:** `a8634e8` (`feat: wire single-instance startup`)
+**Current branch:** `main`
+**Worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy`
+**Latest integration commit:** `cca4eb1` (`feat: integrate Windows session and power events`)
 **Base commit:** `3c2c116`
 
 ## Completed
@@ -31,7 +31,7 @@
 - [x] Added `UsageSqliteStore` for `usage_sessions` and `window_title_intervals`, with parameterized SQL, UTC round-trips, idempotent schema creation, and deterministic connection cleanup.
 - [x] Wired usage tracking into `App` startup/shutdown; title advancement runs on a background `System.Threading.Timer`, not the WPF Dispatcher.
 - [x] Added `SystemEventsSessionPowerEventSource` for lock/unlock and generic suspend/resume notifications; it routes into `SessionPowerEventRouter` and `UsageCollector`, then unsubscribes before collector disposal.
-- [x] Re-samples the foreground window on resume/unlock; resume while locked waits until unlock so the lock screen is not counted as usage.
+- [x] Suppresses foreground Hook callbacks after lock/suspend boundaries; resume or unlock re-samples the current foreground window, and resume while locked waits until unlock.
 - [x] Pinned `SQLitePCLRaw.lib.e_sqlite3` to `2.1.13`; the application vulnerability scan reports no vulnerable packages.
 
 ## Historical test coverage audit — 2026-09-23
@@ -96,13 +96,13 @@ At that checkpoint, the milestone intentionally did **not** include:
 
 ## Verification commands
 
-Run from this worktree with .NET 10 SDK:
+Run from the main checkout with .NET 10 SDK:
 
 ```powershell
 $env:DOTNET_CLI_HOME = "C:\Users\ton20\Documents\works\projects\desktop-puppy\.dotnet-home"
 & "C:\Program Files\dotnet\dotnet.exe" test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --configuration Release
 & "C:\Program Files\dotnet\dotnet.exe" build DesktopPuppy.sln --configuration Release --no-restore
-$env:DESKTOP_PUPPY_EXE = "C:\Users\ton20\.codex\worktrees\foreground-usage-slice\desktop-puppy\src\DesktopPuppy\bin\Release\net10.0-windows\DesktopPuppy.exe"
+$env:DESKTOP_PUPPY_EXE = "C:\Users\ton20\Documents\works\projects\desktop-puppy\src\DesktopPuppy\bin\Release\net10.0-windows\DesktopPuppy.exe"
 & "C:\Program Files\dotnet\dotnet.exe" test tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release --no-restore --filter "Category=Ui"
 & "C:\Program Files\dotnet\dotnet.exe" list src/DesktopPuppy/DesktopPuppy.csproj package --vulnerable --include-transitive
 ```
@@ -122,8 +122,8 @@ The UI test project must be run on an interactive Windows desktop because it lau
 
 - `dotnet` was not available from the existing PowerShell PATH when this work started. Use `C:\Program Files\dotnet\dotnet.exe` or add that directory to PATH.
 - The machine's default NuGet configuration contains a missing Visual Studio offline source. Restore with the explicit source `https://api.nuget.org/v3/index.json` until the project adds a local NuGet configuration.
-- The original checkout has uncommitted documentation edits that predate this worktree. Do not overwrite them; reconcile or cherry-pick deliberately later.
-- The managed worktree is outside the original project directory. Future conversations should use this worktree/branch or inspect this status file before making changes.
+- The main checkout retains local uncommitted README, plan, and design-spec edits, plus the untracked `.dotnet-home/` directory. Preserve these local items unless explicitly asked to change them.
+- The feature worktree at `C:\Users\ton20\.codex\worktrees\foreground-usage-slice\desktop-puppy` remains available, but its changes are merged into `main`. This handoff now describes the main checkout.
 
 ## Historical next resume action (superseded by later checkpoints)
 
@@ -235,7 +235,7 @@ The Windows UI suite verifies the existing WPF interaction/startup behavior only
 5. Verify two-process single-instance activation with a dedicated Windows integration check.
 
 At this pre-native-event checkpoint, 69 unit tests covered the interaction, foreground-usage, aggregation, retention-store, and pure geometry core. The later session/power integration and its 79-test verification are recorded in the following section.
-## Native Windows session/power event integration — 2026-09-24
+## Native Windows session/power event integration and locked-Hook suppression — 2026-09-25
 
 - [x] Added `SystemEventsSessionPowerEventSource` for Windows session lock/unlock and power suspend/resume notifications.
 - [x] Connected the source to `App` startup/shutdown and the existing event router / `UsageCollector` path; the source is unsubscribed before the collector is disposed.
@@ -320,7 +320,7 @@ At this pre-native-event checkpoint, 69 unit tests covered the interaction, fore
 
 ### Verification boundary
 
-Fresh verification on 2026-09-24:
+Fresh verification on 2026-09-25:
 
 ```text
 Unit tests: 79 passed, 0 failed
@@ -329,4 +329,4 @@ Release solution build: 0 warnings, 0 errors
 git diff --check: clean
 ```
 
-The automated adapter tests validate mapping and lifecycle with a fake notification provider. The Windows UI suite validates ordinary app startup/interactions, not delivery of a real lock or power transition. A manual Windows check using lock/unlock and sleep/resume is still required to confirm live OS notification delivery; hibernate-vs-sleep classification is intentionally not claimed by this source.
+The automated adapter tests validate mapping and lifecycle with an injected notification provider. The Windows UI suite validates ordinary app startup/interactions, not delivery of a real lock or power transition. On 2026-09-25, the first full UI run had one window-discovery timeout; the affected case passed alone and the complete 4-test suite passed on rerun. A manual Windows check using lock/unlock and sleep/resume is still required to confirm live OS notification delivery; hibernate-vs-sleep classification is intentionally not claimed by this source.
