@@ -3,8 +3,8 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-24
-**Latest verified step:** Usage/DPI core expansion passes 69 unit tests, 4 Windows UI tests, and Release build with 0 warnings/0 errors.
-**Current phase:** Phase 4 in progress — foreground collection, local-day aggregation, retention policy, and DPI geometry core
+**Latest verified step:** Windows session/power event source and resume refresh are integrated; 79 unit tests, 4 Windows UI tests, and Release build pass (0 warnings/0 errors).
+**Current phase:** Phase 4 in progress — foreground collection, session/power notification wiring, local-day aggregation, retention policy, and DPI geometry core
 **Current branch:** `codex/foreground-usage-slice`
 **Worktree:** `C:\Users\ton20\.codex\worktrees\foreground-usage-slice\desktop-puppy`
 **Milestone commit:** `a8634e8` (`feat: wire single-instance startup`)
@@ -30,11 +30,13 @@
 - [x] Added `UsageCollector` to connect the native watcher, session tracker, title debouncer, and sink contract without putting Win32 calls in the WPF view.
 - [x] Added `UsageSqliteStore` for `usage_sessions` and `window_title_intervals`, with parameterized SQL, UTC round-trips, idempotent schema creation, and deterministic connection cleanup.
 - [x] Wired usage tracking into `App` startup/shutdown; title advancement runs on a background `System.Threading.Timer`, not the WPF Dispatcher.
+- [x] Added `SystemEventsSessionPowerEventSource` for lock/unlock and generic suspend/resume notifications; it routes into `SessionPowerEventRouter` and `UsageCollector`, then unsubscribes before collector disposal.
+- [x] Re-samples the foreground window on resume/unlock; resume while locked waits until unlock so the lock screen is not counted as usage.
 - [x] Pinned `SQLitePCLRaw.lib.e_sqlite3` to `2.1.13`; the application vulnerability scan reports no vulnerable packages.
 
 ## Historical test coverage audit — 2026-09-23
 
-Current automated test count: **33 unit tests passed, 0 failed; 4 Windows UI tests passed, 0 failed**.
+At this historical checkpoint, the automated test count was **33 unit tests passed, 0 failed; 4 Windows UI tests passed, 0 failed**.
 
 Covered by unit tests:
 
@@ -61,7 +63,7 @@ Verified outside unit tests:
 - `git diff --check` is clean;
 - `dotnet list package --vulnerable --include-transitive` reports no vulnerable packages for the application project.
 
-Not yet verified or implemented:
+At this 2026-09-23 checkpoint, the following had not yet been verified or implemented:
 
 - dedicated two-process manual assertion that the second launch activates the first visible pet window;
 - actual WPF transparency, topmost behavior, DPI scaling, multi-monitor movement, monitor removal, and native monitor enumeration;
@@ -70,11 +72,11 @@ Not yet verified or implemented:
 - tray, startup registration, fullscreen detection, AI, reports, settings persistence, and data deletion;
 - the full PRD acceptance matrix.
 
-The **37 automated tests** cover the current interaction and foreground-usage milestone only; they must not be described as full MVP or full PRD coverage.
+At that checkpoint, the **37 automated tests** covered only the interaction and foreground-usage milestone; they were not full MVP or full PRD coverage.
 
-## Current milestone contents
+## Original foreground-usage milestone contents
 
-The current implementation remains offline-only. It now includes:
+At the original foreground-usage checkpoint (2026-09-23), implementation was offline-only and included:
 
 - transparent WPF pet interaction surface;
 - WinEvent foreground-window adapter;
@@ -82,7 +84,7 @@ The current implementation remains offline-only. It now includes:
 - local SQLite usage sessions and title intervals;
 - single-instance startup guard and activation signaling.
 
-It intentionally does **not** include:
+At that checkpoint, the milestone intentionally did **not** include:
 
 - native power/session event adapters;
 - daily aggregation, retention, monitor/DPI/fullscreen adapters, or tray;
@@ -123,7 +125,7 @@ The UI test project must be run on an interactive Windows desktop because it lau
 - The original checkout has uncommitted documentation edits that predate this worktree. Do not overwrite them; reconcile or cherry-pick deliberately later.
 - The managed worktree is outside the original project directory. Future conversations should use this worktree/branch or inspect this status file before making changes.
 
-## Next resume action
+## Historical next resume action (superseded by later checkpoints)
 
 1. Add the native power/session boundary adapter and tests for lock, sleep, hibernate, unlock, and shutdown.
 2. Add daily aggregation with local-midnight splitting on persisted sessions and title intervals.
@@ -194,18 +196,19 @@ Next testability work:
 - [x] Added `UsageCollector` to connect the native watcher, session tracker, title debouncer, and sink contract without putting Win32 calls in the WPF view.
 - [x] Added `UsageSqliteStore` for `usage_sessions` and `window_title_intervals`, with parameterized SQL, UTC round-trips, idempotent schema creation, and deterministic connection cleanup.
 - [x] Wired usage tracking into `App` startup/shutdown; title advancement runs on a background `System.Threading.Timer`, not the WPF Dispatcher.
+
 - [x] Pinned `SQLitePCLRaw.lib.e_sqlite3` to `2.1.13`; `dotnet list package --vulnerable --include-transitive` reports no vulnerable packages for the application project.
 - [x] Verified **33 unit tests passed**, **4 Windows UI tests passed**, and **Release build completed with 0 warnings / 0 errors**.
 
-This slice proves the local usage path, but it is not the complete statistics subsystem yet. Still not verified or implemented: real lock/sleep power-event adapters, daily aggregation, 15-day retention, monitor/DPI placement, fullscreen detection, tray, startup registration, and the full PRD acceptance matrix. Single-instance startup is now wired, but its manual two-process activation behavior still needs a dedicated UI/integration check.
+At the original 2026-09-23 foreground-usage checkpoint, this slice proved the local usage path but was not the complete statistics subsystem. At that time, real lock/sleep power-event adapters, daily aggregation, 15-day retention, monitor/DPI placement, fullscreen detection, tray, startup registration, and the full PRD acceptance matrix remained unfinished; the manual two-process activation check was also still outstanding.
 
-### Next resume action
+### Historical next resume action — 2026-09-23 (superseded by later checkpoints)
 
 1. Add the native power/session boundary adapter and feed lock, sleep, hibernate, unlock, and shutdown events into `UsageCollector.OnSessionBoundary`.
 2. Add daily aggregation and local-day splitting on top of persisted sessions and title intervals.
 3. Add 15-day retention while preserving settings and future encrypted API-key storage.
 4. Add monitor/DPI/fullscreen adapters without moving native calls into WPF views.
-## Current checkpoint — 2026-09-24
+## Pre-native-event checkpoint — 2026-09-24
 
 The testable usage-statistics and DPI core slice is implemented on `codex/foreground-usage-slice`.
 
@@ -225,10 +228,105 @@ Release solution build: 0 warnings, 0 errors
 
 The Windows UI suite verifies the existing WPF interaction/startup behavior only. Still required before claiming complete system integration:
 
-1. Implement and connect the native Windows lock/sleep/hibernate/resume notification source to `SessionPowerEventRouter` / `UsageCollector`.
+1. Manually verify that real Windows lock/unlock and suspend/resume notifications reach the app; automated unit tests use an injected provider and do not exercise live OS delivery.
 2. Invoke and schedule the 15-local-date cleanup from application runtime; `UsageSqliteStore.PruneBefore` currently exists but is not called by `App`.
 3. Connect daily aggregation to a report/statistics consumer.
 4. Connect DPI conversion to native monitor work-area enumeration and the real WPF placement path; test mixed-DPI monitor transitions and monitor removal on Windows.
 5. Verify two-process single-instance activation with a dedicated Windows integration check.
 
-These 69 tests cover the current interaction, foreground-usage, aggregation, retention-store, and pure geometry core; they are not full MVP/PRD acceptance coverage.
+At this pre-native-event checkpoint, 69 unit tests covered the interaction, foreground-usage, aggregation, retention-store, and pure geometry core. The later session/power integration and its 79-test verification are recorded in the following section.
+## Native Windows session/power event integration — 2026-09-24
+
+- [x] Added `SystemEventsSessionPowerEventSource` for Windows session lock/unlock and power suspend/resume notifications.
+- [x] Connected the source to `App` startup/shutdown and the existing event router / `UsageCollector` path; the source is unsubscribed before the collector is disposed.
+- [x] Added explicit `SessionBoundary.Suspend`. Windows `PowerModes.Suspend` is recorded as a generic suspend boundary; this source does not assert whether Windows used sleep or hibernate.
+- [x] Added a foreground snapshot refresh on resume and unlock. Resume while the session is still locked is intentionally ignored until unlock, preventing a locked interval from reopening usage tracking.
+- [x] Added unit coverage for event normalization, irrelevant notifications, unsubscription, routing, lock-state gating, and resumed collection. These tests use an injected notification provider and do **not** prove that the live Windows desktop delivered the native notifications.
+
+### Per-test purpose, coverage, and target effect
+
+#### `SystemEventsSessionPowerEventSourceTests`
+
+1. `Session_lock_and_unlock_notifications_are_normalized_with_the_current_time` (two theory rows)
+   - **Purpose:** Catch reversed or incorrect mapping of lock/unlock notifications, or timestamps not taken from the injected clock.
+   - **Coverage:** `SessionLock`, `SessionUnlock`, normalized event value, and event timestamp.
+   - **Target effect:** Each notification reaches the consumer as its corresponding normalized event at the clock's current UTC time.
+2. `Unrelated_session_switch_reasons_do_not_emit_usage_events`
+   - **Purpose:** Prevent session-connect notifications from being mistaken for a lock boundary.
+   - **Coverage:** A non-lock/unlock reason (`ConsoleConnect`).
+   - **Target effect:** No normalized event is emitted for unrelated session-switch reasons.
+3. `Suspend_and_resume_notifications_are_normalized` (two theory rows)
+   - **Purpose:** Catch swapped or missing power-mode mappings.
+   - **Coverage:** `PowerModes.Suspend` and `PowerModes.Resume`, including timestamps.
+   - **Target effect:** Suspend and resume reach the router as distinct normalized events.
+4. `Power_status_change_does_not_end_or_restart_a_foreground_session`
+   - **Purpose:** Prevent battery or AC-status changes from closing or refreshing a usage session.
+   - **Coverage:** `PowerModes.StatusChange`.
+   - **Target effect:** A power-status-only notification emits no session/power event.
+5. `Disposing_the_source_unsubscribes_it_from_later_system_notifications`
+   - **Purpose:** Catch leaked static event subscriptions that could call a disposed collector during app shutdown.
+   - **Coverage:** Session and power notifications raised after source disposal.
+   - **Target effect:** Neither later notification reaches the consumer.
+
+#### `SessionPowerEventRouterTests`
+
+1. `Locked_event_routes_lock_boundary_at_event_time`
+   - **Purpose:** Catch a lost lock boundary or a boundary timestamp replaced with processing time.
+   - **Coverage:** Normalized lock event and supplied timestamp.
+   - **Target effect:** Exactly one `Lock` boundary is forwarded at the event time.
+2. `Suspend_event_routes_generic_suspend_boundary`
+   - **Purpose:** Ensure the platform's generic suspend signal closes usage without falsely labeling it as hibernate.
+   - **Coverage:** Normalized suspend event.
+   - **Target effect:** Exactly one generic `Suspend` boundary is forwarded.
+3. `Hibernate_event_routes_hibernate_boundary`
+   - **Purpose:** Preserve routing for an explicitly identified hibernate event from a future or more specific provider.
+   - **Coverage:** An already-normalized `Hibernate` event; this does not claim the current Windows source distinguishes hibernate.
+   - **Target effect:** The explicit event maps to the `Hibernate` boundary.
+4. `Shutdown_event_routes_shutdown_boundary`
+   - **Purpose:** Protect the existing shutdown close behavior.
+   - **Coverage:** Normalized shutdown event and its event time.
+   - **Target effect:** Exactly one `Shutdown` boundary is forwarded.
+5. `Unlock_requests_a_foreground_refresh_without_creating_a_boundary`
+   - **Purpose:** Ensure unlocking resumes foreground discovery without inventing a usage boundary.
+   - **Coverage:** Unlock callback and boundary callback counts.
+   - **Target effect:** One foreground refresh is requested and no boundary is emitted.
+6. `Resume_requests_a_foreground_refresh_when_the_session_is_unlocked`
+   - **Purpose:** Prevent tracking from remaining stopped when the foreground window did not change during suspend.
+   - **Coverage:** Suspend followed by resume while not locked.
+   - **Target effect:** The suspend boundary is preserved and one fresh foreground sample is requested on resume.
+7. `Resume_while_locked_waits_until_unlock_before_refreshing_foreground`
+   - **Purpose:** Prevent a resume into the lock screen from reopening a usage session.
+   - **Coverage:** Lock → suspend → resume while locked → unlock sequence.
+   - **Target effect:** Resume does not refresh while locked; unlock performs exactly one refresh, with no extra boundaries.
+8. `Unknown_session_event_is_ignored`
+   - **Purpose:** Make future or malformed enum values fail closed.
+   - **Coverage:** An undefined normalized event value.
+   - **Target effect:** No boundary or refresh callback runs.
+9. `Repeated_boundary_without_open_session_does_not_emit_duplicate_close`
+   - **Purpose:** Protect idempotent session closure when Windows emits repeated boundary notifications.
+   - **Coverage:** Two lock events with no foreground session remaining after the first.
+   - **Target effect:** Only the original foreground session is closed once.
+
+#### `UsageCollectorTests` additions
+
+1. `Resume_refreshes_the_current_window_and_starts_a_new_usage_session`
+   - **Purpose:** Catch a broken handoff from resume routing to the foreground watcher / collector.
+   - **Coverage:** Same foreground process before and after suspend, with explicit event times.
+   - **Target effect:** Usage is split at suspend; a new session starts at resume even though the active window did not change.
+2. `Resume_while_locked_does_not_count_the_lock_screen_and_unlock_refreshes_usage`
+   - **Purpose:** Prevent foreground Hook callbacks during a locked interval from reopening usage, and ensure collection recovers after unlock.
+   - **Coverage:** Lock → Hook reports the Windows lock-screen process → suspend → resume while locked → restore the application as current foreground → unlock refresh → shutdown.
+   - **Target effect:** The lock-screen callback creates no usage session; unlock takes one fresh sample and resumes tracking the actual application.
+
+### Verification boundary
+
+Fresh verification on 2026-09-24:
+
+```text
+Unit tests: 79 passed, 0 failed
+Windows UI tests: 4 passed, 0 failed
+Release solution build: 0 warnings, 0 errors
+git diff --check: clean
+```
+
+The automated adapter tests validate mapping and lifecycle with a fake notification provider. The Windows UI suite validates ordinary app startup/interactions, not delivery of a real lock or power transition. A manual Windows check using lock/unlock and sleep/resume is still required to confirm live OS notification delivery; hibernate-vs-sleep classification is intentionally not claimed by this source.

@@ -7,6 +7,7 @@ public enum SessionBoundary
 {
     Lock,
     Sleep,
+    Suspend,
     Hibernate,
     Shutdown
 }

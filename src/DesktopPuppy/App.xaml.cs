@@ -15,6 +15,7 @@ public partial class App : Application
     private UsageCollector? _usageCollector;
     private UsageSqliteStore? _usageStore;
     private IForegroundWindowWatcher? _foregroundWatcher;
+    private SystemEventsSessionPowerEventSource? _sessionPowerEventSource;
     private Timer? _usageAdvanceTimer;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -39,6 +40,8 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _sessionPowerEventSource?.Dispose();
+        _sessionPowerEventSource = null;
         _usageAdvanceTimer?.Dispose();
         _usageAdvanceTimer = null;
         _usageCollector?.Dispose();
@@ -54,18 +57,20 @@ public partial class App : Application
     private void StartUsageTracking()
     {
         var watcher = new WinEventForegroundWatcher();
+        SystemEventsSessionPowerEventSource? sessionPowerEventSource = null;
         try
         {
             var clock = new SystemClock();
             _foregroundWatcher = watcher;
             _usageStore = new UsageSqliteStore();
             _usageStore.Initialize();
-            _usageCollector = new UsageCollector(
+            var collector = new UsageCollector(
                 Process.GetCurrentProcess().ProcessName,
                 clock,
                 watcher,
                 _usageStore);
-            _usageCollector.Start();
+            _usageCollector = collector;
+            collector.Start();
             _usageAdvanceTimer = new Timer(
                 static state =>
                 {
@@ -79,12 +84,21 @@ public partial class App : Application
                         // Application shutdown can race with the final timer callback.
                     }
                 },
-                new UsageTimerState(_usageCollector, clock),
+                new UsageTimerState(collector, clock),
                 TimeSpan.FromMilliseconds(250),
                 TimeSpan.FromMilliseconds(250));
+
+            var router = new SessionPowerEventRouter(
+                (boundary, at) => collector.OnSessionBoundary(boundary, at),
+                collector.RefreshForegroundWindow);
+            sessionPowerEventSource = new SystemEventsSessionPowerEventSource(clock);
+            sessionPowerEventSource.Start(router.OnEvent);
+            _sessionPowerEventSource = sessionPowerEventSource;
         }
         catch
         {
+            sessionPowerEventSource?.Dispose();
+            _sessionPowerEventSource = null;
             _usageAdvanceTimer?.Dispose();
             _usageAdvanceTimer = null;
             if (_usageCollector is not null)

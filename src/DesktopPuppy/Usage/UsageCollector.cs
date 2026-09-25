@@ -20,6 +20,7 @@ public sealed class UsageCollector : IDisposable
     private readonly WindowTitleDebouncer _titleDebouncer;
     private bool _started;
     private bool _disposed;
+    private bool _foregroundCollectionPaused;
 
     public UsageCollector(
         string ownProcessName,
@@ -67,6 +68,7 @@ public sealed class UsageCollector : IDisposable
                 return;
             }
 
+            _foregroundCollectionPaused = false;
             _foregroundWatcher.Start(OnForegroundChanged);
             _started = true;
         }
@@ -98,7 +100,23 @@ public sealed class UsageCollector : IDisposable
 
             var occurredAt = at ?? _clock.UtcNow;
             _sessionTracker.OnSessionBoundary(boundary, occurredAt);
+            _foregroundCollectionPaused = true;
             _titleDebouncer.OnForegroundWindowLeft(occurredAt);
+        }
+    }
+
+    public void RefreshForegroundWindow()
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_started)
+            {
+                return;
+            }
+
+            _foregroundCollectionPaused = false;
+            _foregroundWatcher.RefreshForegroundWindow();
         }
     }
 
@@ -112,6 +130,7 @@ public sealed class UsageCollector : IDisposable
             }
 
             var at = _clock.UtcNow;
+            _foregroundCollectionPaused = true;
             _foregroundWatcher.Stop();
             _sessionTracker.OnSessionBoundary(SessionBoundary.Shutdown, at);
             _titleDebouncer.OnForegroundWindowLeft(at);
@@ -139,7 +158,7 @@ public sealed class UsageCollector : IDisposable
     {
         lock (_gate)
         {
-            if (!_started || _disposed)
+            if (!_started || _disposed || _foregroundCollectionPaused)
             {
                 return;
             }

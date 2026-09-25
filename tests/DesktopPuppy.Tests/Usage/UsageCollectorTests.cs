@@ -57,6 +57,80 @@ public sealed class UsageCollectorTests
     }
 
     [Fact]
+    public void Resume_refreshes_the_current_window_and_starts_a_new_usage_session()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        var router = new SessionPowerEventRouter(
+            (boundary, at) => collector.OnSessionBoundary(boundary, at),
+            collector.RefreshForegroundWindow);
+
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddMinutes(3));
+        router.OnEvent(SessionPowerEvent.Suspend, clock.UtcNow);
+        clock.Set(Start.AddMinutes(5));
+        router.OnEvent(SessionPowerEvent.Resume, clock.UtcNow);
+        clock.Set(Start.AddMinutes(6));
+        collector.Stop();
+
+        Assert.Collection(
+            sink.Sessions,
+            first =>
+            {
+                Assert.Equal("Code", first.ProcessName);
+                Assert.Equal(Start, first.StartedAt);
+                Assert.Equal(Start.AddMinutes(3), first.EndedAt);
+            },
+            second =>
+            {
+                Assert.Equal("Code", second.ProcessName);
+                Assert.Equal(Start.AddMinutes(5), second.StartedAt);
+                Assert.Equal(Start.AddMinutes(6), second.EndedAt);
+            });
+        Assert.Equal(1, watcher.RefreshCount);
+    }
+
+    [Fact]
+    public void Resume_while_locked_does_not_count_the_lock_screen_and_unlock_refreshes_usage()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        var router = new SessionPowerEventRouter(
+            (boundary, at) => collector.OnSessionBoundary(boundary, at),
+            collector.RefreshForegroundWindow);
+
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddMinutes(2));
+        router.OnEvent(SessionPowerEvent.Locked, clock.UtcNow);
+        watcher.Emit(Snapshot(77, "LockApp", "Windows Lock Screen"));
+        clock.Set(Start.AddMinutes(3));
+        router.OnEvent(SessionPowerEvent.Suspend, clock.UtcNow);
+        clock.Set(Start.AddMinutes(4));
+        router.OnEvent(SessionPowerEvent.Resume, clock.UtcNow);
+        Assert.Equal(0, watcher.RefreshCount);
+        watcher.SetCurrentSnapshot(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddMinutes(5));
+        router.OnEvent(SessionPowerEvent.Unlocked, clock.UtcNow);
+        clock.Set(Start.AddMinutes(6));
+        collector.Stop();
+
+        Assert.Collection(
+            sink.Sessions,
+            first => Assert.Equal(Start.AddMinutes(2), first.EndedAt),
+            second =>
+            {
+                Assert.Equal(Start.AddMinutes(5), second.StartedAt);
+                Assert.Equal(Start.AddMinutes(6), second.EndedAt);
+            });
+        Assert.Equal(1, watcher.RefreshCount);
+    }
+    [Fact]
     public void Desktop_Puppy_foreground_events_close_tracking_without_recording_the_pet()
     {
         var watcher = new FakeForegroundWindowWatcher();
@@ -94,11 +168,32 @@ public sealed class UsageCollectorTests
 
         public void Start(Action<ForegroundWindowSnapshot> onForegroundChanged) => _callback = onForegroundChanged;
 
+        private ForegroundWindowSnapshot? _currentSnapshot;
+
+        public int RefreshCount { get; private set; }
+
+        public void RefreshForegroundWindow()
+        {
+            if (_currentSnapshot is null)
+            {
+                return;
+            }
+
+            RefreshCount++;
+            _callback?.Invoke(_currentSnapshot);
+        }
+
+        public void SetCurrentSnapshot(ForegroundWindowSnapshot snapshot) => _currentSnapshot = snapshot;
+
         public void Stop() => _callback = null;
 
         public void Dispose() => Stop();
 
-        public void Emit(ForegroundWindowSnapshot snapshot) => _callback?.Invoke(snapshot);
+        public void Emit(ForegroundWindowSnapshot snapshot)
+        {
+            _currentSnapshot = snapshot;
+            _callback?.Invoke(snapshot);
+        }
     }
 
     private sealed class RecordingUsageSink : IUsageEventSink
@@ -123,10 +218,3 @@ public sealed class UsageCollectorTests
         }
     }
 }
-
-
-
-
-
-
-

@@ -58,6 +58,41 @@ public sealed class WinEventForegroundWatcher : IForegroundWindowWatcher
         }
     }
 
+    public void RefreshForegroundWindow()
+    {
+        Action<ForegroundWindowSnapshot>? callback;
+        lock (_gate)
+        {
+            if (_disposed || _thread is null)
+            {
+                return;
+            }
+
+            callback = _onForegroundChanged;
+        }
+
+        var windowHandle = GetForegroundWindow();
+        if (windowHandle == 0)
+        {
+            return;
+        }
+
+        var snapshot = ReadSnapshot(windowHandle);
+        if (snapshot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            callback?.Invoke(snapshot);
+        }
+        catch
+        {
+            // A consumer exception must not destabilize the foreground watcher.
+        }
+    }
+
     public void Stop()
     {
         Thread? thread;
@@ -287,8 +322,9 @@ public sealed class WinEventForegroundWatcher : IForegroundWindowWatcher
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowTextLength(nint windowHandle);
 
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint GetWindowThreadProcessId(nint windowHandle, out uint processId);
 }
-
-
