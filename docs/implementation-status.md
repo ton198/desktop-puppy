@@ -2,12 +2,12 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-25
-**Latest verified step:** Merged the Windows session/power integration and lock-screen Hook suppression to `main` (`cca4eb1`); 79 unit tests and 4 Windows UI tests pass, and Release build has 0 warnings / 0 errors. The initial UI-suite run had one window-discovery timeout; the isolated test and a complete rerun both passed.
-**Current phase:** Phase 4 in progress — foreground collection, session/power notification wiring, local-day aggregation, retention policy, and DPI geometry core
+**Last updated:** 2026-09-26
+**Latest verified step:** Merged the end-to-end daily usage statistics and 15-local-date retention feature to `main` (`2aa0fd7`); post-merge verification passed 101 unit tests, 11 Windows UI tests, and a Release build with 0 warnings / 0 errors.
+**Current phase:** Phase 4 in progress — foreground collection, session/power wiring, local-day aggregation, 15-date retention, and the statistics window are implemented; live OS acceptance checks and native monitor/DPI integration remain.
 **Current branch:** `main`
 **Worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy`
-**Latest integration commit:** `cca4eb1` (`feat: integrate Windows session and power events`)
+**Latest integration commit:** `2aa0fd7` (`Merge branch 'codex/usage-statistics-window-retention'`)
 **Base commit:** `3c2c116`
 
 ## Completed
@@ -33,6 +33,12 @@
 - [x] Added `SystemEventsSessionPowerEventSource` for lock/unlock and generic suspend/resume notifications; it routes into `SessionPowerEventRouter` and `UsageCollector`, then unsubscribes before collector disposal.
 - [x] Suppresses foreground Hook callbacks after lock/suspend boundaries; resume or unlock re-samples the current foreground window, and resume while locked waits until unlock.
 - [x] Pinned `SQLitePCLRaw.lib.e_sqlite3` to `2.1.13`; the application vulnerability scan reports no vulnerable packages.
+- [x] Added `UsageStatisticsQueryService` to combine a consistent live-collector snapshot with persisted sessions/title intervals, clip data to the snapshot time, and produce local-date totals ranked by application and title.
+- [x] Added the separate usage-statistics window and pet entry point; the view distinguishes a valid empty day from unavailable data, supports the retained 15 local dates and application/title drill-down, and refreshes on activation and every 30 seconds.
+- [x] Bound UI Automation names to the actual total-duration and error text so tests and accessibility clients can read the rendered values.
+- [x] Connected 15-local-date retention to startup, a background daily-date check, and resume; cleanup runs once per local date, clips boundary-crossing intervals, and retries after failures.
+- [x] Merged feature branch `codex/usage-statistics-window-retention` at `44274d4` into `main` as merge commit `2aa0fd7`; no push was performed.
+- [x] Verified the merged `main`: **101 unit tests passed**, **11 Windows UI tests passed**, and the Release solution build completed with **0 warnings / 0 errors**.
 
 ## Historical test coverage audit — 2026-09-23
 
@@ -330,3 +336,253 @@ git diff --check: clean
 ```
 
 The automated adapter tests validate mapping and lifecycle with an injected notification provider. The Windows UI suite validates ordinary app startup/interactions, not delivery of a real lock or power transition. On 2026-09-25, the first full UI run had one window-discovery timeout; the affected case passed alone and the complete 4-test suite passed on rerun. A manual Windows check using lock/unlock and sleep/resume is still required to confirm live OS notification delivery; hibernate-vs-sleep classification is intentionally not claimed by this source.
+
+## Daily usage statistics, 15-date retention, and statistics window — 2026-09-26
+
+### Delivered behavior
+
+- The statistics window is a separate, reusable window opened from the pet; it does not replace or resize the pet. Reopening reloads current data.
+- Daily totals are computed from persisted usage plus a single live-session snapshot. Sessions and titles are capped at the same `AsOfUtc`, split/aggregated by the selected local date, grouped and ranked by application and title.
+- The date selector exposes today and the previous fourteen local dates. Refreshing across local midnight advances that range, retains a still-valid selection, and moves an expired selection to the new local today.
+- A valid day with no activity is displayed as a normal zero/empty state. Storage/query failures are shown as unavailable, not fabricated as zero usage.
+- While open, the statistics window refreshes on activation and every 30 seconds. Retention is scheduled at startup and checked after resume; it keeps the current fifteen local dates and clips rows that cross the cutoff.
+
+### Test-by-test purpose, coverage, and target effect
+
+Each listed test has an explicit purpose, coverage boundary, and target effect. Existing interaction and low-level foreground tests are recorded in the historical sections above; this inventory covers the statistics/retention path added or extended for this milestone.
+
+#### `DailyUsageAggregatorTests` — local-date aggregation
+
+1. `Same_day_session_contributes_full_duration_to_one_local_day`
+   - **Purpose:** Catch lost or altered duration for a session contained in one day.
+   - **Coverage:** A same-local-day foreground session and its full interval.
+   - **Target effect:** The one date receives the complete elapsed duration.
+2. `Session_crossing_local_midnight_is_split_between_both_dates`
+   - **Purpose:** Prevent overnight use from being assigned wholly to its start date.
+   - **Coverage:** One session spanning two local dates.
+   - **Target effect:** Each date receives only its own portion of the session.
+3. `Session_ending_at_midnight_does_not_create_zero_duration_next_day_bucket`
+   - **Purpose:** Avoid spurious rows for an interval ending exactly at midnight.
+   - **Coverage:** An end instant at the next date's local midnight.
+   - **Target effect:** No zero-duration entry is created for the following date.
+4. `Aggregation_uses_injected_local_timezone_instead_of_UTC_date`
+   - **Purpose:** Prevent UTC calendar dates from replacing the user's local reporting dates.
+   - **Coverage:** A time zone whose local date differs from the UTC date.
+   - **Target effect:** The session is attributed using the injected local zone.
+5. `Multiple_sessions_for_same_process_are_summed_without_merging_other_processes`
+   - **Purpose:** Keep process totals grouped correctly across separate foreground intervals.
+   - **Coverage:** Multiple sessions from one process and a second process.
+   - **Target effect:** Same-process durations sum together while different process totals remain separate.
+6. `Title_intervals_split_at_midnight_and_remain_separate_by_title`
+   - **Purpose:** Keep title detail consistent with daily application totals.
+   - **Coverage:** Title intervals crossing local midnight and distinct titles.
+   - **Target effect:** Each title is split by date without conflating title names.
+7. `Open_title_interval_is_capped_at_explicit_as_of_time`
+   - **Purpose:** Prevent an ongoing title interval from accruing beyond the report snapshot.
+   - **Coverage:** An open interval and an injected `asOfUtc` value.
+   - **Target effect:** The reported title duration ends exactly at `asOfUtc`.
+8. `Spring_forward_day_uses_elapsed_utc_duration_and_one_local_date`
+   - **Purpose:** Avoid losing or inventing elapsed time on the spring DST transition.
+   - **Coverage:** A session crossing the skipped local hour.
+   - **Target effect:** Elapsed UTC duration is correct and remains on the intended local date.
+9. `Fall_back_day_counts_repeated_local_hour_once_per_elapsed_interval`
+   - **Purpose:** Avoid double counting the repeated wall-clock hour during fall DST.
+   - **Coverage:** A session spanning the repeated local hour.
+   - **Target effect:** Duration reflects elapsed time once, with local-date attribution intact.
+
+#### `UsageSqliteStoreRetentionTests` — database retention and clipping
+
+1. `Retention_cutoff_is_midnight_of_oldest_of_fifteen_local_dates`
+   - **Purpose:** Keep the retention boundary aligned to fifteen calendar dates rather than a fixed-hour duration.
+   - **Coverage:** Policy cutoff with an injected local time zone.
+   - **Target effect:** The cutoff is the oldest retained local midnight converted to UTC.
+2. `Session_ending_exactly_at_cutoff_is_deleted_but_session_starting_at_cutoff_is_kept`
+   - **Purpose:** Define the exact inclusive/exclusive boundary and prevent off-by-one retention.
+   - **Coverage:** Sessions ending at and starting at the cutoff instant.
+   - **Target effect:** Expired sessions are removed while sessions beginning at cutoff are retained.
+3. `Sessions_and_closed_titles_wholly_older_than_cutoff_are_deleted`
+   - **Purpose:** Remove fully expired persisted usage data.
+   - **Coverage:** Old sessions and closed title intervals entirely before cutoff.
+   - **Target effect:** Neither expired record remains in storage.
+4. `Session_crossing_cutoff_is_clipped_and_keeps_only_retained_duration`
+   - **Purpose:** Preserve the retained portion of a session instead of dropping useful data.
+   - **Coverage:** One session that starts before and ends after cutoff.
+   - **Target effect:** Its start is moved to cutoff and only its retained duration remains.
+5. `Closed_title_interval_crossing_cutoff_is_clipped_without_changing_its_end`
+   - **Purpose:** Retain valid title detail while removing its expired portion.
+   - **Coverage:** Closed title interval crossing cutoff.
+   - **Target effect:** Start is clipped to cutoff and original end remains unchanged.
+6. `Open_title_interval_crossing_cutoff_is_clipped_and_remains_open`
+   - **Purpose:** Ensure cleanup does not accidentally close a currently active title interval.
+   - **Coverage:** Open title interval beginning before cutoff.
+   - **Target effect:** Start is clipped while `EndedAt` remains null.
+7. `Repeated_retention_cleanup_is_idempotent`
+   - **Purpose:** Make repeated startup/resume/date checks safe.
+   - **Coverage:** Applying the same cutoff more than once.
+   - **Target effect:** Subsequent pruning leaves retained data unchanged.
+8. `Retention_cleanup_does_not_modify_unrelated_tables`
+   - **Purpose:** Constrain cleanup to usage-owned tables.
+   - **Coverage:** An unrelated table alongside usage records.
+   - **Target effect:** Unrelated table data is preserved.
+9. `Retention_cutoff_tracks_local_calendar_across_daylight_saving_change`
+   - **Purpose:** Prevent a fixed UTC offset from shifting the local-calendar retention window at DST.
+   - **Coverage:** Cutoff arithmetic around a daylight-saving transition.
+   - **Target effect:** Cutoff follows local calendar midnight using the correct offset.
+10. `Clipped_timestamps_round_trip_as_utc_instants`
+    - **Purpose:** Protect timestamp kind/offset semantics during SQLite persistence.
+    - **Coverage:** A clipped record written and read back from SQLite.
+    - **Target effect:** Stored timestamps return as the same UTC instants.
+
+#### `UsageStatisticsQueryServiceTests` — persisted plus live report query
+
+1. `Query_counts_active_session_only_through_snapshot_as_of`
+   - **Purpose:** Show current foreground usage without requiring the session to close first.
+   - **Coverage:** Active session, clock-captured snapshot, selected local date, and application total.
+   - **Target effect:** Live duration contributes only from session start through snapshot time.
+2. `Query_deduplicates_active_session_when_closed_row_appears_during_read`
+   - **Purpose:** Prevent double counting at the transition from a live session to a persisted row.
+   - **Coverage:** Matching session IDs in live and persisted state, including a persisted end after snapshot time.
+   - **Target effect:** One session contributes once and is capped at the snapshot.
+3. `Query_clips_title_interval_closed_after_snapshot_as_of`
+   - **Purpose:** Keep a title interval from extending the report beyond its refresh instant.
+   - **Coverage:** Persisted title ending after `AsOfUtc`.
+   - **Target effect:** The title duration ends at the snapshot timestamp.
+4. `Query_returns_selected_local_date_with_ranked_apps_and_title_details`
+   - **Purpose:** Produce the complete daily application/title hierarchy.
+   - **Coverage:** Repeated process/title rows, an adjacent date, selected local date, and descending ranking.
+   - **Target effect:** Only the requested date appears, grouped totals are correct, and apps/titles are ranked by duration.
+5. `Query_returns_empty_daily_statistics_when_date_has_no_usage`
+   - **Purpose:** Represent a valid no-activity date distinctly from a query failure.
+   - **Coverage:** Empty database result for the requested date.
+   - **Target effect:** The requested date returns zero total and no applications.
+6. `Query_propagates_store_read_failure_for_the_view_to_report`
+   - **Purpose:** Preserve storage errors so the UI can show unavailable data.
+   - **Coverage:** A disposed SQLite store during query.
+   - **Target effect:** The read failure propagates instead of becoming an empty report.
+
+#### `UsageStatisticsViewModelTests` — selection, refresh, and UI state
+
+1. `View_model_exposes_today_and_previous_fourteen_local_dates`
+   - **Purpose:** Align selectable history with the retention policy.
+   - **Coverage:** Fixed UTC clock near a date boundary and injected UTC+14 zone.
+   - **Target effect:** Exactly fifteen consecutive local dates appear newest-first, with local today selected.
+2. `Selecting_date_queries_and_displays_that_date`
+   - **Purpose:** Ensure date navigation reaches the data query.
+   - **Coverage:** Selecting a retained prior date and receiving its report.
+   - **Target effect:** Requested, selected, and displayed dates agree.
+3. `Selecting_application_exposes_only_its_title_details`
+   - **Purpose:** Keep title details scoped to the chosen application.
+   - **Coverage:** Two application summaries and repeated selection changes.
+   - **Target effect:** Only the selected process's titles are exposed; daily total is unchanged.
+4. `Older_query_completion_cannot_replace_newer_date_selection`
+   - **Purpose:** Prevent a delayed earlier read from overwriting the latest user selection.
+   - **Coverage:** Two controlled query tasks completed in reverse order.
+   - **Target effect:** Only the newest request updates report, loading, and error state.
+5. `Refreshing_after_local_midnight_advances_dates_and_keeps_retained_selection`
+   - **Purpose:** Roll the date list forward without discarding a selection that remains retained.
+   - **Coverage:** Injected clock crossing local midnight with a still-valid prior date selected.
+   - **Target effect:** New date list is published and the valid selection is preserved.
+6. `Refreshing_after_local_midnight_moves_expired_selection_to_newest_date`
+   - **Purpose:** Prevent a date outside retention from remaining selected.
+   - **Coverage:** Oldest retained date selected before midnight, then clock advances.
+   - **Target effect:** Selection and report move to new local today.
+7. `Empty_result_produces_normal_zero_state`
+   - **Purpose:** Treat a successful empty result as normal, not an operational error.
+   - **Coverage:** Successful zero-total query with no applications.
+   - **Target effect:** Empty statistics are shown, error stays clear, and loading ends.
+8. `Query_failure_produces_error_without_fabricated_empty_report`
+   - **Purpose:** Prevent failed reads from appearing as zero usage.
+   - **Coverage:** Query task failing with an I/O exception.
+   - **Target effect:** Error is populated, statistics remain null, and loading ends.
+
+#### Runtime wiring tests — active snapshot and retention after resume
+
+1. `UsageCollectorTests.Statistics_snapshot_captures_clock_and_open_session_together`
+   - **Purpose:** Keep the active session and report timestamp as one coherent observation.
+   - **Coverage:** Foreground session with an injected clock advanced before snapshot capture.
+   - **Target effect:** Snapshot carries the same `AsOfUtc` and an open session with no end time.
+2. `UsageCollectorTests.Statistics_snapshot_has_no_active_session_before_foreground_or_after_boundary`
+   - **Purpose:** Exclude absent and boundary-closed sessions from live totals.
+   - **Coverage:** Snapshot before foreground, then after a lock boundary.
+   - **Target effect:** Active session is null in both states and the closed session is persisted once.
+3. `UsageCollectorTests.Resume_refreshes_the_current_window_and_starts_a_new_usage_session`
+   - **Purpose:** Ensure resume restarts usage when the foreground window has not changed during sleep.
+   - **Coverage:** Same foreground process before and after suspend, with explicit boundary and resume times.
+   - **Target effect:** The pre-suspend session ends, a new one starts at resume, and the watcher is refreshed once.
+4. `UsageCollectorTests.Resume_while_locked_does_not_count_the_lock_screen_and_unlock_refreshes_usage`
+   - **Purpose:** Prevent the Windows lock screen from being counted as user application time after resume.
+   - **Coverage:** Lock, lock-screen foreground event, suspend, resume while locked, restore app, unlock, and shutdown.
+   - **Target effect:** No locked-screen interval is recorded; tracking resumes only after unlock refreshes the app.
+5. `SessionPowerEventRouterTests.Resume_requests_resume_work_and_foreground_refresh_when_the_session_is_unlocked`
+   - **Purpose:** Preserve both cleanup and foreground recovery actions after an ordinary resume.
+   - **Coverage:** Suspend followed by resume while unlocked, with independent callback counts.
+   - **Target effect:** Resume work and foreground refresh each run exactly once, without an extra session boundary.
+6. `SessionPowerEventRouterTests.Resume_while_locked_requests_retention_without_refreshing_foreground`
+
+   - **Purpose:** Run cleanup after sleep even when Windows resumes to a locked session.
+   - **Coverage:** Locked → suspend → resume flow and callback counts.
+   - **Target effect:** Retention is checked once while foreground refresh stays suppressed.
+
+#### `UsageStatisticsWindowUiTests` and related Windows UI checks — real WPF behavior
+
+1. `Statistics_button_opens_separate_statistics_window`
+   - **Purpose:** Verify the feature is reachable without replacing the desktop pet.
+   - **Coverage:** Real pet process, button invocation, separate statistics window, duplicate-open attempt.
+   - **Target effect:** Exactly one visible statistics window opens and the pet remains visible.
+2. `Statistics_window_shows_seeded_date_ranking_and_selected_title_detail`
+   - **Purpose:** Verify database-to-view bindings and user selections using a real WPF window.
+   - **Coverage:** Seeded prior date, total duration, app ranking, selected application and title durations.
+   - **Target effect:** The displayed total is 2 h 15 min, apps rank correctly, and title details match the selected app.
+3. `Statistics_window_shows_empty_state_for_a_date_without_usage`
+   - **Purpose:** Ensure a normal no-activity date is not shown as an error.
+   - **Coverage:** Unseeded retained date and empty/error automation states.
+   - **Target effect:** Empty-state UI is visible and error UI is absent.
+4. `Usage_tracking_startup_failure_does_not_prevent_statistics_window_from_opening`
+   - **Purpose:** Keep the pet usable when optional tracking/database access fails.
+   - **Coverage:** Real startup with an invalid database path, pet and statistics window, accessible error state.
+   - **Target effect:** Both windows open, error text is readable, and no empty report is fabricated.
+5. `Closing_and_reopening_statistics_window_reloads_current_data`
+   - **Purpose:** Verify the statistics window can be closed and reused without stale data.
+   - **Coverage:** Open, close via `WM_CLOSE`, mutate isolated SQLite data, reopen, and enumerate windows.
+   - **Target effect:** One new window shows updated totals and no duplicate window remains.
+6. `App_startup_prunes_expired_rows_and_clips_retained_boundary_rows`
+   - **Purpose:** Prove retention is connected to actual application startup.
+   - **Coverage:** Real launch with expired and cutoff-crossing rows pre-seeded in SQLite.
+   - **Target effect:** Expired data is deleted, crossing data starts at cutoff, and the pet stays running.
+7. `Usage_statistics_seed_uses_fixed_local_date_baseline`
+   - **Purpose:** Prevent flaky UI seeds whose relative dates shift while a test runs.
+   - **Coverage:** Explicit fixed local-date baseline and derived yesterday/boundary timestamp properties.
+   - **Target effect:** Seed date calculations remain anchored to construction date.
+8. `DesktopPuppyWindowUiTests.Desktop_puppy_window_exposes_a_stable_ui_automation_surface`
+   - **Purpose:** Protect the real pet window's stable automation entry point used by the feature.
+   - **Coverage:** Pet window Automation ID/name, close control identifier and invocation, and process exit.
+   - **Target effect:** Automation can reliably locate and close the pet by stable identifiers.
+
+### Post-merge verification — 2026-09-26
+
+Run from `C:\Users\ton20\Documents\works\projects\desktop-puppy` on an interactive Windows desktop:
+
+```powershell
+dotnet build DesktopPuppy.sln --configuration Release --no-restore
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore
+$env:DESKTOP_PUPPY_EXE = "C:\Users\ton20\Documents\works\projects\desktop-puppy\src\DesktopPuppy\bin\Release\net10.0-windows\DesktopPuppy.exe"
+dotnet test tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release --no-restore --filter "Category=Ui"
+```
+
+Observed on the merged `main` at `2aa0fd7`:
+
+```text
+Release build: 0 warnings, 0 errors
+Unit tests: 101 passed, 0 failed
+Windows UI tests: 11 passed, 0 failed
+```
+
+The UI test project must run on an interactive Windows desktop and requires `DESKTOP_PUPPY_EXE` to point to the built app. These tests verify windows, UI Automation, seeded reports, and startup retention; they do not verify actual operating-system lock/suspend notification delivery or visually wait through the 30-second refresh interval.
+
+### Remaining verification and feature work
+
+- Manually confirm on Windows that real lock/unlock and suspend/resume notifications stop and resume usage correctly. The current Windows power source reports generic suspend and does not claim to distinguish sleep from hibernate.
+- Manually observe the live statistics window refresh over its 30-second interval and verify behavior across actual local midnight; automated tests cover injected-clock logic and activation refresh.
+- Complete native monitor/work-area enumeration and connect DPI geometry policy to the production WPF placement path; verify mixed-DPI movement, monitor removal, and edge clamping on hardware or an equivalent Windows setup.
+- Run a dedicated two-process check that a second launch activates the first pet.
+- Remaining broader PRD work includes fullscreen detection, tray/startup registration, settings persistence/deletion, and AI/report features. The full PRD acceptance matrix is not complete.
