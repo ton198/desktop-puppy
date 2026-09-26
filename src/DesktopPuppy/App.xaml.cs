@@ -17,6 +17,7 @@ public partial class App : Application
     private IForegroundWindowWatcher? _foregroundWatcher;
     private SystemEventsSessionPowerEventSource? _sessionPowerEventSource;
     private Timer? _usageAdvanceTimer;
+    private Timer? _usageRetentionCheckTimer;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,6 +43,8 @@ public partial class App : Application
     {
         _sessionPowerEventSource?.Dispose();
         _sessionPowerEventSource = null;
+        _usageRetentionCheckTimer?.Dispose();
+        _usageRetentionCheckTimer = null;
         _usageAdvanceTimer?.Dispose();
         _usageAdvanceTimer = null;
         _usageCollector?.Dispose();
@@ -64,6 +67,21 @@ public partial class App : Application
             _foregroundWatcher = watcher;
             _usageStore = new UsageSqliteStore();
             _usageStore.Initialize();
+
+            var retentionCoordinator = new UsageRetentionCoordinator(
+                _usageStore.PruneBefore,
+                TimeZoneInfo.Local);
+            TryCheckUsageRetention(retentionCoordinator, clock);
+            _usageRetentionCheckTimer = new Timer(
+                static state =>
+                {
+                    var runtime = (UsageRetentionTimerState)state!;
+                    TryCheckUsageRetention(runtime.Coordinator, runtime.Clock);
+                },
+                new UsageRetentionTimerState(retentionCoordinator, clock),
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromMinutes(1));
+
             var collector = new UsageCollector(
                 Process.GetCurrentProcess().ProcessName,
                 clock,
@@ -90,7 +108,8 @@ public partial class App : Application
 
             var router = new SessionPowerEventRouter(
                 (boundary, at) => collector.OnSessionBoundary(boundary, at),
-                collector.RefreshForegroundWindow);
+                collector.RefreshForegroundWindow,
+                () => TryCheckUsageRetention(retentionCoordinator, clock));
             sessionPowerEventSource = new SystemEventsSessionPowerEventSource(clock);
             sessionPowerEventSource.Start(router.OnEvent);
             _sessionPowerEventSource = sessionPowerEventSource;
@@ -99,6 +118,8 @@ public partial class App : Application
         {
             sessionPowerEventSource?.Dispose();
             _sessionPowerEventSource = null;
+            _usageRetentionCheckTimer?.Dispose();
+            _usageRetentionCheckTimer = null;
             _usageAdvanceTimer?.Dispose();
             _usageAdvanceTimer = null;
             if (_usageCollector is not null)
@@ -115,6 +136,23 @@ public partial class App : Application
             _usageStore?.Dispose();
             _usageStore = null;
             // Usage tracking is optional at startup; the offline pet remains runnable.
+        }
+    }
+
+    private static void TryCheckUsageRetention(UsageRetentionCoordinator coordinator, IClock clock)
+    {
+        try
+        {
+            coordinator.CheckAndPrune(clock.UtcNow);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Application shutdown can race with a timer callback.
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Usage history cleanup failed: {exception}");
+            // Cleanup is best-effort; the coordinator leaves this local date due for retry.
         }
     }
 
@@ -142,4 +180,6 @@ public partial class App : Application
     }
 
     private sealed record UsageTimerState(UsageCollector Collector, IClock Clock);
+
+    private sealed record UsageRetentionTimerState(UsageRetentionCoordinator Coordinator, IClock Clock);
 }

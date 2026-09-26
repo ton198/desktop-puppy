@@ -15,22 +15,26 @@ public sealed class SessionPowerEventRouter
     private readonly object _gate = new();
     private readonly Action<SessionBoundary, DateTimeOffset> _onBoundary;
     private readonly Action _onForegroundRefresh;
+    private readonly Action _onResume;
     private bool _isLocked;
 
     public SessionPowerEventRouter(
         Action<SessionBoundary, DateTimeOffset> onBoundary,
-        Action onForegroundRefresh)
+        Action onForegroundRefresh,
+        Action? onResume = null)
     {
         ArgumentNullException.ThrowIfNull(onBoundary);
         ArgumentNullException.ThrowIfNull(onForegroundRefresh);
         _onBoundary = onBoundary;
         _onForegroundRefresh = onForegroundRefresh;
+        _onResume = onResume ?? (() => { });
     }
 
     public void OnEvent(SessionPowerEvent sessionEvent, DateTimeOffset at)
     {
         SessionBoundary? boundary = null;
         var refreshForeground = false;
+        var requestResumeWork = false;
 
         lock (_gate)
         {
@@ -54,6 +58,7 @@ public sealed class SessionPowerEventRouter
                     boundary = SessionBoundary.Shutdown;
                     break;
                 case SessionPowerEvent.Resume:
+                    requestResumeWork = true;
                     refreshForeground = !_isLocked;
                     break;
             }
@@ -62,6 +67,11 @@ public sealed class SessionPowerEventRouter
         if (boundary is not null)
         {
             _onBoundary(boundary.Value, at);
+        }
+
+        if (requestResumeWork)
+        {
+            _onResume();
         }
 
         if (refreshForeground)

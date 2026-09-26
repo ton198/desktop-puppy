@@ -73,18 +73,24 @@ public sealed class SessionPowerEventRouterTests
     }
 
     [Fact]
-    public void Resume_requests_a_foreground_refresh_when_the_session_is_unlocked()
+    public void Resume_requests_resume_work_and_foreground_refresh_when_the_session_is_unlocked()
     {
+        // Purpose: preserve both post-resume actions for an unlocked session.
+        // Coverage: suspend followed by resume while the router is not locked.
+        // Target effect: resume work and foreground refresh are each requested once.
         var routed = new List<(SessionBoundary Boundary, DateTimeOffset At)>();
         var refreshCount = 0;
+        var resumeWorkCount = 0;
         var router = new SessionPowerEventRouter(
             (boundary, at) => routed.Add((boundary, at)),
-            () => refreshCount++);
+            () => refreshCount++,
+            () => resumeWorkCount++);
 
         router.OnEvent(SessionPowerEvent.Suspend, Start.AddMinutes(3));
         router.OnEvent(SessionPowerEvent.Resume, Start.AddMinutes(4));
 
         Assert.Equal((SessionBoundary.Suspend, Start.AddMinutes(3)), Assert.Single(routed));
+        Assert.Equal(1, resumeWorkCount);
         Assert.Equal(1, refreshCount);
     }
 
@@ -108,6 +114,27 @@ public sealed class SessionPowerEventRouterTests
 
         Assert.Equal(1, refreshCount);
         Assert.Equal(2, routed.Count);
+    }
+
+    [Fact]
+    public void Resume_while_locked_requests_retention_without_refreshing_foreground()
+    {
+        // Purpose: ensure a post-resume retention check is not deferred until session unlock.
+        // Coverage: locked session state followed by suspend and resume.
+        // Target effect: resume requests retention once while foreground refresh remains suppressed.
+        var refreshCount = 0;
+        var retentionCheckCount = 0;
+        var router = new SessionPowerEventRouter(
+            (_, _) => { },
+            () => refreshCount++,
+            () => retentionCheckCount++);
+
+        router.OnEvent(SessionPowerEvent.Locked, Start.AddMinutes(2));
+        router.OnEvent(SessionPowerEvent.Suspend, Start.AddMinutes(3));
+        router.OnEvent(SessionPowerEvent.Resume, Start.AddMinutes(4));
+
+        Assert.Equal(1, retentionCheckCount);
+        Assert.Equal(0, refreshCount);
     }
 
     [Fact]
