@@ -48,7 +48,16 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button x:Name="StatisticsButton"
+                    AutomationProperties.AutomationId="StatisticsButton"
+                    AutomationProperties.Name="打开使用统计"
+                    Style="{StaticResource ChromeButton}"
+                    Width="48"
+                    FontSize="12"
+                    Content="统计"
+                    ToolTip="打开使用统计"
+                    Click="StatisticsButton_OnClick" />
             <Button x:Name="CloseButton"
                     AutomationProperties.AutomationId="CloseButton"
                     AutomationProperties.Name="退出 Desktop Puppy"
@@ -56,7 +65,7 @@
                     Content="×"
                     ToolTip="退出 Desktop Puppy"
                     Click="CloseButton_OnClick" />
-        </Grid>
+        </StackPanel>
 
         <Grid Grid.Row="1" Margin="12,0,12,12">
             <Border x:Name="BubbleBorder"

@@ -26,6 +26,8 @@ public partial class PetWindow : Window
     private int _lineIndex;
     private bool _dragStarted;
 
+    public event EventHandler? StatisticsRequested;
+
     public PetWindow()
     {
         InitializeComponent();
@@ -179,6 +181,12 @@ public partial class PetWindow : Window
     private void BubbleCloseButton_OnClick(object sender, RoutedEventArgs e)
     {
         BubbleBorder.Visibility = Visibility.Collapsed;
+        e.Handled = true;
+    }
+
+    private void StatisticsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        StatisticsRequested?.Invoke(this, EventArgs.Empty);
         e.Handled = true;
     }
 

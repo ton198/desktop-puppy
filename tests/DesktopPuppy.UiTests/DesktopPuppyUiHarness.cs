@@ -19,15 +19,20 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         _process = process;
     }
 
-    public static DesktopPuppyUiHarness Start(string executablePath)
+    public static DesktopPuppyUiHarness Start(string executablePath, string? usageDatabasePath = null)
     {
-        var process = Process.Start(new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
             WorkingDirectory = Path.GetDirectoryName(executablePath),
-            UseShellExecute = true
-        });
+            UseShellExecute = false
+        };
+        if (usageDatabasePath is not null)
+        {
+            startInfo.Environment["DESKTOP_PUPPY_USAGE_DB_PATH"] = usageDatabasePath;
+        }
 
+        var process = Process.Start(startInfo);
         if (process is null)
         {
             throw new InvalidOperationException($"Could not start '{executablePath}'.");
@@ -68,6 +73,23 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         throw new TimeoutException($"No visible '{WindowTitle}' window was found for process {_process.Id}.");
     }
 
+    public AutomationElement WaitForTopLevelWindow(string automationId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            var element = FindVisibleTopLevelWindow(_process.Id, automationId);
+            if (element is not null)
+            {
+                return element;
+            }
+
+            Thread.Sleep(50);
+        }
+
+        throw new TimeoutException(
+            $"Top-level UI Automation window '{automationId}' was not found for process {_process.Id}.");
+    }
     public AutomationElement FindByAutomationId(AutomationElement root, string automationId)
     {
         var condition = new PropertyCondition(
@@ -87,11 +109,10 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         {
             try
             {
-                var currentRoot = AutomationElement.FromHandle(_windowHandle);
                 var condition = new PropertyCondition(
                     AutomationElement.AutomationIdProperty,
                     automationId);
-                var element = currentRoot.FindFirst(TreeScope.Descendants, condition);
+                var element = root.FindFirst(TreeScope.Descendants, condition);
                 if (element is not null && !element.Current.IsOffscreen)
                 {
                     return element;
@@ -103,7 +124,7 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             }
             catch (ElementNotAvailableException)
             {
-                // Retry while the element is replaced by WPF after a visibility change.
+                // Retry while WPF replaces an element.
             }
 
             Thread.Sleep(50);
@@ -122,11 +143,10 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         {
             try
             {
-                var currentRoot = AutomationElement.FromHandle(_windowHandle);
                 var condition = new PropertyCondition(
                     AutomationElement.AutomationIdProperty,
                     automationId);
-                var element = currentRoot.FindFirst(TreeScope.Descendants, condition);
+                var element = root.FindFirst(TreeScope.Descendants, condition);
                 if (element is null || element.Current.IsOffscreen)
                 {
                     return;
@@ -146,6 +166,112 @@ public sealed class DesktopPuppyUiHarness : IDisposable
 
         throw new TimeoutException($"UI Automation element '{automationId}' remained visible.");
     }
+
+    public IReadOnlyList<string> WaitForListItemNames(
+        AutomationElement root,
+        string listAutomationId,
+        int expectedCount,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        IReadOnlyList<string> lastNames = [];
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var list = FindByAutomationId(root, listAutomationId);
+                var items = list.FindAll(
+                    TreeScope.Descendants,
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
+                lastNames = items.Cast<AutomationElement>().Select(ReadListItemText).ToArray();
+                if (lastNames.Count == expectedCount)
+                {
+                    return lastNames;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Retry until the list is populated.
+            }
+            catch (ElementNotAvailableException)
+            {
+                // Retry while WPF refreshes the list.
+            }
+
+            Thread.Sleep(50);
+        }
+
+        throw new TimeoutException(
+            $"List '{listAutomationId}' did not contain {expectedCount} items. Last items: {string.Join(" | ", lastNames)}");
+    }
+
+    public void SelectComboBoxItem(AutomationElement root, string comboAutomationId, string itemName)
+    {
+        var combo = FindByAutomationId(root, comboAutomationId);
+        var expandPattern = (ExpandCollapsePattern)combo.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+        expandPattern.Expand();
+        var containerPattern = (ItemContainerPattern)combo.GetCurrentPattern(ItemContainerPattern.Pattern);
+        var item = containerPattern.FindItemByProperty(
+            startAfter: null,
+            AutomationElement.NameProperty,
+            itemName);
+        if (item is null && DateOnly.TryParseExact(itemName, "yyyy-MM-dd", out var date))
+        {
+            item = containerPattern.FindItemByProperty(
+                startAfter: null,
+                AutomationElement.NameProperty,
+                date.ToString());
+        }
+
+        if (item is null)
+        {
+            throw new InvalidOperationException($"Combo box item '{itemName}' was not found.");
+        }
+        ((SelectionItemPattern)item.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        expandPattern.Collapse();
+    }
+
+    public void SelectListItemContaining(AutomationElement root, string listAutomationId, string text)
+    {
+        var list = FindByAutomationId(root, listAutomationId);
+        var items = list.FindAll(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
+        var item = items.Cast<AutomationElement>().FirstOrDefault(
+            candidate => ReadListItemText(candidate).Contains(text, StringComparison.Ordinal));
+        if (item is null)
+        {
+            throw new InvalidOperationException($"List item containing '{text}' was not found.");
+        }
+
+        ((SelectionItemPattern)item.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+    }
+
+    public void CloseWindow(AutomationElement window)
+    {
+        ((WindowPattern)window.GetCurrentPattern(WindowPattern.Pattern)).Close();
+    }
+
+    public void WaitForTopLevelWindowToDisappear(string automationId, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (FindVisibleTopLevelWindow(_process.Id, automationId) is null)
+            {
+                return;
+            }
+
+            Thread.Sleep(50);
+        }
+
+        throw new TimeoutException($"Top-level window '{automationId}' remained visible.");
+    }
+
+    public int CountTopLevelWindows(string automationId) =>
+        CountVisibleTopLevelWindows(_process.Id, automationId);
+
+    public bool IsProcessRunning => !_process.HasExited;
 
     public void Invoke(AutomationElement element)
     {
@@ -336,6 +462,77 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         }
     }
 
+    private static string ReadListItemText(AutomationElement item)
+    {
+        var textElements = item.FindAll(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text));
+        var parts = textElements.Cast<AutomationElement>()
+            .Select(element => element.Current.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToArray();
+        return parts.Length == 0 ? item.Current.Name : string.Join(" | ", parts);
+    }
+    private static int CountVisibleTopLevelWindows(int processId, string automationId)
+    {
+        var count = 0;
+        EnumWindows((handle, _) =>
+        {
+            GetWindowThreadProcessId(handle, out var currentProcessId);
+            if (currentProcessId != processId || !IsWindowVisible(handle))
+            {
+                return true;
+            }
+
+            try
+            {
+                var element = AutomationElement.FromHandle(handle);
+                if (element is not null && element.Current.AutomationId == automationId)
+                {
+                    count++;
+                }
+            }
+            catch (COMException) { }
+            catch (ElementNotAvailableException) { }
+            return true;
+        }, IntPtr.Zero);
+        return count;
+    }
+    private static AutomationElement? FindVisibleTopLevelWindow(int processId, string automationId)
+    {
+        AutomationElement? found = null;
+        EnumWindows((handle, _) =>
+        {
+            GetWindowThreadProcessId(handle, out var currentProcessId);
+            if (currentProcessId != processId || !IsWindowVisible(handle))
+            {
+                return true;
+            }
+
+            try
+            {
+                var element = AutomationElement.FromHandle(handle);
+                if (element is not null &&
+                    string.Equals(element.Current.AutomationId, automationId, StringComparison.Ordinal))
+                {
+                    found = element;
+                    return false;
+                }
+            }
+            catch (COMException)
+            {
+                // UIA can race WPF while a top-level window enters the automation tree.
+            }
+            catch (ElementNotAvailableException)
+            {
+                // Retry while WPF replaces or closes the top-level window.
+            }
+
+            return true;
+        }, IntPtr.Zero);
+
+        return found;
+    }
     private static IntPtr FindVisibleWindow(int processId)
     {
         IntPtr found = IntPtr.Zero;
@@ -472,4 +669,3 @@ public readonly record struct WindowRect(int Left, int Top, int Right, int Botto
 {
     public (int X, int Y) Center => ((Left + Right) / 2, (Top + Bottom) / 2);
 }
-

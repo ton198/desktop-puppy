@@ -4,6 +4,7 @@ using System.Windows;
 using DesktopPuppy.Core.Clock;
 using DesktopPuppy.Native;
 using DesktopPuppy.Pet;
+using DesktopPuppy.Pet.Statistics;
 using DesktopPuppy.Usage;
 
 namespace DesktopPuppy;
@@ -18,6 +19,8 @@ public partial class App : Application
     private SystemEventsSessionPowerEventSource? _sessionPowerEventSource;
     private Timer? _usageAdvanceTimer;
     private Timer? _usageRetentionCheckTimer;
+    private IUsageStatisticsQuery? _usageStatisticsQuery;
+    private UsageStatisticsWindow? _usageStatisticsWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -35,12 +38,20 @@ public partial class App : Application
         StartUsageTracking();
 
         _petWindow = new PetWindow();
+        _petWindow.StatisticsRequested += PetWindow_OnStatisticsRequested;
         MainWindow = _petWindow;
         _petWindow.Show();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_petWindow is not null)
+        {
+            _petWindow.StatisticsRequested -= PetWindow_OnStatisticsRequested;
+        }
+
+        _usageStatisticsWindow = null;
+        _usageStatisticsQuery = null;
         _sessionPowerEventSource?.Dispose();
         _sessionPowerEventSource = null;
         _usageRetentionCheckTimer?.Dispose();
@@ -65,7 +76,8 @@ public partial class App : Application
         {
             var clock = new SystemClock();
             _foregroundWatcher = watcher;
-            _usageStore = new UsageSqliteStore();
+            _usageStore = new UsageSqliteStore(
+                Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH"));
             _usageStore.Initialize();
 
             var retentionCoordinator = new UsageRetentionCoordinator(
@@ -113,6 +125,10 @@ public partial class App : Application
             sessionPowerEventSource = new SystemEventsSessionPowerEventSource(clock);
             sessionPowerEventSource.Start(router.OnEvent);
             _sessionPowerEventSource = sessionPowerEventSource;
+            _usageStatisticsQuery = new UsageStatisticsQueryService(
+                _usageStore,
+                collector,
+                TimeZoneInfo.Local);
         }
         catch
         {
@@ -133,6 +149,7 @@ public partial class App : Application
 
             _usageCollector = null;
             _foregroundWatcher = null;
+            _usageStatisticsQuery = null;
             _usageStore?.Dispose();
             _usageStore = null;
             // Usage tracking is optional at startup; the offline pet remains runnable.
@@ -156,6 +173,36 @@ public partial class App : Application
         }
     }
 
+    private void PetWindow_OnStatisticsRequested(object? sender, EventArgs e)
+    {
+        if (_usageStatisticsWindow is not null)
+        {
+            if (_usageStatisticsWindow.WindowState == WindowState.Minimized)
+            {
+                _usageStatisticsWindow.WindowState = WindowState.Normal;
+            }
+
+            _usageStatisticsWindow.Activate();
+            return;
+        }
+
+        var viewModel = new UsageStatisticsViewModel(
+            _usageStatisticsQuery ?? UnavailableUsageStatisticsQuery.Instance,
+            TimeZoneInfo.Local,
+            () => DateTimeOffset.UtcNow);
+        var window = new UsageStatisticsWindow(viewModel);
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_usageStatisticsWindow, window))
+            {
+                _usageStatisticsWindow = null;
+            }
+        };
+        _usageStatisticsWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
     private void ActivateExistingInstance()
     {
         Dispatcher.BeginInvoke(() =>
@@ -177,6 +224,19 @@ public partial class App : Application
 
             _petWindow.Activate();
         });
+    }
+
+    private sealed class UnavailableUsageStatisticsQuery : IUsageStatisticsQuery
+    {
+        public static UnavailableUsageStatisticsQuery Instance { get; } = new();
+
+        public Task<DailyUsageStatistics> QueryAsync(
+            DateOnly localDate,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromException<DailyUsageStatistics>(
+                new InvalidOperationException("使用统计数据当前不可用。"));
+        }
     }
 
     private sealed record UsageTimerState(UsageCollector Collector, IClock Clock);

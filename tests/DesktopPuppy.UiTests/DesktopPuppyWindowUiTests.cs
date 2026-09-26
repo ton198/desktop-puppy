@@ -5,6 +5,9 @@ namespace DesktopPuppy.UiTests;
 
 public sealed class DesktopPuppyWindowUiTests
 {
+    // Purpose: Verify the pet exposes a stable and accessible Windows UI Automation entry surface.
+    // Coverage: Real pet process, top-level window name, close-button Automation ID/name, invoke pattern, and process exit.
+    // Target effect: Automation clients can find and close the pet through stable identifiers.
     [Fact]
     [Trait("Category", "Ui")]
     public void Desktop_puppy_window_exposes_a_stable_ui_automation_surface()
