@@ -10,6 +10,10 @@ public interface IUsageEventSink
     void UpsertWindowTitleInterval(WindowTitleInterval interval);
 }
 
+public sealed record UsageCollectorStatisticsSnapshot(
+    DateTimeOffset AsOfUtc,
+    ForegroundSession? ActiveSession);
+
 public sealed class UsageCollector : IDisposable
 {
     private readonly object _gate = new();
@@ -55,6 +59,15 @@ public sealed class UsageCollector : IDisposable
             {
                 return _started;
             }
+        }
+    }
+
+    public UsageCollectorStatisticsSnapshot CaptureStatisticsSnapshot()
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return new UsageCollectorStatisticsSnapshot(_clock.UtcNow, _sessionTracker.OpenSession);
         }
     }
 
