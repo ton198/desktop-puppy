@@ -10,6 +10,55 @@ public sealed class UsageCollectorTests
     private static readonly DateTimeOffset Start = new(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Statistics_snapshot_captures_clock_and_open_session_together()
+    {
+        // Purpose: make the live statistics timestamp and active session one coherent observation.
+        // Coverage/target: a fixed clock and foreground event return the same AsOfUtc and open process.
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        var asOfUtc = Start.AddMinutes(3);
+        clock.Set(asOfUtc);
+
+        var snapshot = collector.CaptureStatisticsSnapshot();
+
+        Assert.Equal(asOfUtc, snapshot.AsOfUtc);
+        Assert.NotNull(snapshot.ActiveSession);
+        Assert.Equal("Code", snapshot.ActiveSession.ProcessName);
+        Assert.Equal(Start, snapshot.ActiveSession.StartedAt);
+        Assert.Null(snapshot.ActiveSession.EndedAt);
+    }
+
+    [Fact]
+    public void Statistics_snapshot_has_no_active_session_before_foreground_or_after_boundary()
+    {
+        // Purpose: absent or boundary-closed foreground work must never appear as a live session.
+        // Coverage/target: snapshots are null before foreground and after lock; the closed session persists once.
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+
+        collector.Start();
+
+        Assert.Null(collector.CaptureStatisticsSnapshot().ActiveSession);
+
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        var boundaryAt = Start.AddMinutes(3);
+        clock.Set(boundaryAt);
+        collector.OnSessionBoundary(SessionBoundary.Lock);
+
+        Assert.Null(collector.CaptureStatisticsSnapshot().ActiveSession);
+        var closed = Assert.Single(sink.Sessions);
+        Assert.Equal("Code", closed.ProcessName);
+        Assert.Equal(boundaryAt, closed.EndedAt);
+    }
+
+    [Fact]
     public void Foreground_changes_flow_into_sessions_and_stable_title_intervals()
     {
         var watcher = new FakeForegroundWindowWatcher();
