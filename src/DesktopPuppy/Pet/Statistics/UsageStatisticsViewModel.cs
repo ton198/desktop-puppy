@@ -7,7 +7,10 @@ namespace DesktopPuppy.Pet.Statistics;
 public sealed class UsageStatisticsViewModel : INotifyPropertyChanged
 {
     private readonly IUsageStatisticsQuery _query;
+    private readonly TimeZoneInfo _timeZone;
+    private readonly Func<DateTimeOffset> _utcNow;
     private long _latestRequestId;
+    private IReadOnlyList<DateOnly> _availableDates;
     private DateOnly _selectedDate;
     private ApplicationStatistics? _selectedApplication;
     private DailyUsageStatistics? _statistics;
@@ -24,18 +27,19 @@ public sealed class UsageStatisticsViewModel : INotifyPropertyChanged
         ArgumentNullException.ThrowIfNull(utcNow);
 
         _query = query;
-        var localToday = DateOnly.FromDateTime(
-            TimeZoneInfo.ConvertTime(utcNow(), timeZone).DateTime);
-        AvailableDates = Array.AsReadOnly(
-            Enumerable.Range(0, 15)
-                .Select(daysAgo => localToday.AddDays(-daysAgo))
-                .ToArray());
-        _selectedDate = localToday;
+        _timeZone = timeZone;
+        _utcNow = utcNow;
+        _availableDates = BuildAvailableDates();
+        _selectedDate = _availableDates[0];
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public IReadOnlyList<DateOnly> AvailableDates { get; }
+    public IReadOnlyList<DateOnly> AvailableDates
+    {
+        get => _availableDates;
+        private set => SetProperty(ref _availableDates, value);
+    }
 
     public DateOnly SelectedDate
     {
@@ -94,6 +98,7 @@ public sealed class UsageStatisticsViewModel : INotifyPropertyChanged
 
     public async Task RefreshAsync()
     {
+        RefreshAvailableDates();
         var requestedDate = SelectedDate;
         var requestId = Interlocked.Increment(ref _latestRequestId);
         var selectedProcessName = SelectedApplication?.ProcessName;
@@ -136,6 +141,35 @@ public sealed class UsageStatisticsViewModel : INotifyPropertyChanged
     {
         Interlocked.Increment(ref _latestRequestId);
         IsLoading = false;
+    }
+
+    private IReadOnlyList<DateOnly> BuildAvailableDates()
+    {
+        var localToday = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTime(_utcNow(), _timeZone).DateTime);
+        return Array.AsReadOnly(
+            Enumerable.Range(0, UsageRetentionPolicy.RetainedLocalDates)
+                .Select(daysAgo => localToday.AddDays(-daysAgo))
+                .ToArray());
+    }
+
+    private void RefreshAvailableDates()
+    {
+        var refreshedDates = BuildAvailableDates();
+        if (AvailableDates[0] == refreshedDates[0])
+        {
+            return;
+        }
+
+        AvailableDates = refreshedDates;
+        if (AvailableDates.Contains(SelectedDate))
+        {
+            return;
+        }
+
+        SelectedDate = AvailableDates[0];
+        Statistics = null;
+        SelectedApplication = null;
     }
 
     private bool IsLatestRequest(long requestId, DateOnly requestedDate)

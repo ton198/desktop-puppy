@@ -25,7 +25,7 @@ public sealed class UsageStatisticsViewModelTests
             timeZone,
             () => FixedUtcNow);
 
-        Assert.Equal(15, viewModel.AvailableDates.Count);
+        Assert.Equal(UsageRetentionPolicy.RetainedLocalDates, viewModel.AvailableDates.Count);
         Assert.Equal(new DateOnly(2026, 9, 26), viewModel.SelectedDate);
         Assert.Equal(
             [
@@ -152,6 +152,64 @@ public sealed class UsageStatisticsViewModelTests
         Assert.Null(viewModel.ErrorMessage);
     }
 
+    // Purpose: Roll the date selector forward at local midnight without discarding a still-retained user choice.
+    // Coverage: An advancing injected UTC clock crosses midnight while a prior retained date is selected.
+    // Target effect: The 15-date list includes the new local today, raises AvailableDates, and keeps the selected date.
+    [Fact]
+    public async Task Refreshing_after_local_midnight_advances_dates_and_keeps_retained_selection()
+    {
+        var clock = new AdvancingClock(
+            new DateTimeOffset(2026, 9, 25, 23, 59, 0, TimeSpan.Zero));
+        var query = new RecordingQuery(date => Task.FromResult(EmptyStatistics(date)));
+        var viewModel = new UsageStatisticsViewModel(
+            query,
+            TimeZoneInfo.Utc,
+            () => clock.UtcNow);
+        var retainedSelection = new DateOnly(2026, 9, 24);
+        await viewModel.SelectDateAsync(retainedSelection);
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        clock.Advance(TimeSpan.FromMinutes(2));
+        await viewModel.RefreshAsync();
+
+        Assert.Equal(UsageRetentionPolicy.RetainedLocalDates, viewModel.AvailableDates.Count);
+        Assert.Equal(new DateOnly(2026, 9, 26), viewModel.AvailableDates[0]);
+        Assert.Equal(new DateOnly(2026, 9, 12), viewModel.AvailableDates[^1]);
+        Assert.Equal(retainedSelection, viewModel.SelectedDate);
+        Assert.Equal(retainedSelection, query.RequestedDates[^1]);
+        Assert.Contains(nameof(UsageStatisticsViewModel.AvailableDates), changedProperties);
+        Assert.DoesNotContain(nameof(UsageStatisticsViewModel.SelectedDate), changedProperties);
+    }
+
+    // Purpose: Prevent a date that has fallen outside retention from remaining selected after midnight.
+    // Coverage: The oldest retained date is selected before the injected clock advances to the next local day.
+    // Target effect: Refresh moves selection to the new local today and notifies both date-list and selection bindings.
+    [Fact]
+    public async Task Refreshing_after_local_midnight_moves_expired_selection_to_newest_date()
+    {
+        var clock = new AdvancingClock(
+            new DateTimeOffset(2026, 9, 25, 23, 59, 0, TimeSpan.Zero));
+        var query = new RecordingQuery(date => Task.FromResult(EmptyStatistics(date)));
+        var viewModel = new UsageStatisticsViewModel(
+            query,
+            TimeZoneInfo.Utc,
+            () => clock.UtcNow);
+        await viewModel.SelectDateAsync(new DateOnly(2026, 9, 11));
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        clock.Advance(TimeSpan.FromMinutes(2));
+        await viewModel.RefreshAsync();
+
+        var newToday = new DateOnly(2026, 9, 26);
+        Assert.Equal(newToday, viewModel.SelectedDate);
+        Assert.Equal(newToday, query.RequestedDates[^1]);
+        Assert.Equal(newToday, Assert.IsType<DailyUsageStatistics>(viewModel.Statistics).LocalDate);
+        Assert.Contains(nameof(UsageStatisticsViewModel.AvailableDates), changedProperties);
+        Assert.Contains(nameof(UsageStatisticsViewModel.SelectedDate), changedProperties);
+    }
+
     // Purpose: Treat a valid day with no tracked activity as normal data rather than a read error.
     // Coverage: A successful query returning the requested date, zero duration, and no applications.
     // Target effect: Statistics contains the empty report while ErrorMessage remains clear.
@@ -202,6 +260,13 @@ public sealed class UsageStatisticsViewModelTests
     {
         return new TaskCompletionSource<DailyUsageStatistics>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class AdvancingClock(DateTimeOffset utcNow)
+    {
+        public DateTimeOffset UtcNow { get; private set; } = utcNow;
+
+        public void Advance(TimeSpan elapsed) => UtcNow += elapsed;
     }
 
     private sealed class RecordingQuery(
