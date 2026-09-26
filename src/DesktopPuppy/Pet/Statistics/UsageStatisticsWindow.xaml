@@ -82,7 +82,8 @@
                     <StackPanel DockPanel.Dock="Left">
                         <TextBlock Text="当日总时长" Foreground="#FF64748B" FontSize="13" />
                         <TextBlock AutomationProperties.AutomationId="StatisticsTotalDuration"
-                                   AutomationProperties.Name="当日总时长"
+                                   AutomationProperties.Name="{Binding Statistics.TotalDuration, Converter={StaticResource ElapsedDurationConverter}}"
+                                   AutomationProperties.HelpText="当日总时长"
                                    Margin="0,4,0,0"
                                    Foreground="#FF0F172A"
                                    FontSize="30"
@@ -130,7 +131,8 @@
                             </TextBlock.Style>
                         </TextBlock>
                         <TextBlock AutomationProperties.AutomationId="StatisticsErrorState"
-                                   AutomationProperties.Name="统计错误状态"
+                                   AutomationProperties.Name="{Binding ErrorMessage}"
+                                   AutomationProperties.HelpText="统计错误状态"
                                    MaxWidth="430"
                                    Text="{Binding ErrorMessage}"
                                    TextWrapping="Wrap"

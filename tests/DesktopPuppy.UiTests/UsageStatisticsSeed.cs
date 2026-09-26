@@ -7,9 +7,11 @@ namespace DesktopPuppy.UiTests;
 public sealed class UsageStatisticsSeed : IDisposable
 {
     private readonly string _directory;
+    private readonly DateOnly _localToday;
 
-    public UsageStatisticsSeed()
+    public UsageStatisticsSeed(DateOnly? localToday = null)
     {
+        _localToday = localToday ?? DateOnly.FromDateTime(DateTime.Now);
         _directory = Path.Combine(Path.GetTempPath(), "DesktopPuppy.UiTests", Guid.NewGuid().ToString("N"));
         DatabasePath = Path.Combine(_directory, "usage.db");
         using var store = OpenStore();
@@ -17,7 +19,7 @@ public sealed class UsageStatisticsSeed : IDisposable
 
     public string DatabasePath { get; }
 
-    public DateOnly Yesterday => DateOnly.FromDateTime(DateTime.Now).AddDays(-1);
+    public DateOnly Yesterday => _localToday.AddDays(-1);
 
     public DateOnly DayBeforeYesterday => Yesterday.AddDays(-1);
 

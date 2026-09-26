@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -10,6 +11,7 @@ public sealed class DesktopPuppyUiHarness : IDisposable
 {
     private const string WindowTitle = "Desktop Puppy";
     private const int ShowNormal = 1;
+    private const uint WmClose = 0x0010;
     private readonly Process _process;
     private IntPtr _windowHandle;
     private bool _disposed;
@@ -167,6 +169,44 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         throw new TimeoutException($"UI Automation element '{automationId}' remained visible.");
     }
 
+    public string WaitForAutomationName(
+        AutomationElement root,
+        string automationId,
+        Func<string, bool> predicate,
+        TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        var lastName = string.Empty;
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var element = FindByAutomationId(root, automationId);
+                lastName = element.Current.Name;
+                if (!element.Current.IsOffscreen && predicate(lastName))
+                {
+                    return lastName;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Retry until WPF creates the automation peer.
+            }
+            catch (COMException)
+            {
+                // Retry while UIA refreshes the WPF tree.
+            }
+            catch (ElementNotAvailableException)
+            {
+                // Retry while WPF replaces the bound element.
+            }
+
+            Thread.Sleep(50);
+        }
+
+        throw new TimeoutException(
+            $"UI Automation element '{automationId}' did not reach the expected name. Last name: '{lastName}'.");
+    }
     public IReadOnlyList<string> WaitForListItemNames(
         AutomationElement root,
         string listAutomationId,
@@ -249,7 +289,16 @@ public sealed class DesktopPuppyUiHarness : IDisposable
 
     public void CloseWindow(AutomationElement window)
     {
-        ((WindowPattern)window.GetCurrentPattern(WindowPattern.Pattern)).Close();
+        var handle = new IntPtr(window.Current.NativeWindowHandle);
+        if (handle == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("The UI Automation window has no native window handle.");
+        }
+
+        if (!PostMessage(handle, WmClose, IntPtr.Zero, IntPtr.Zero))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not post WM_CLOSE to the window.");
+        }
     }
 
     public void WaitForTopLevelWindowToDisappear(string automationId, TimeSpan timeout)
@@ -631,6 +680,9 @@ public sealed class DesktopPuppyUiHarness : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr handle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool PostMessage(IntPtr handle, uint message, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowRect")]
     private static extern bool GetNativeWindowRect(IntPtr handle, out NativeWindowRect rect);

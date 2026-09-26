@@ -42,8 +42,13 @@ public sealed class UsageStatisticsWindowUiTests
 
         harness.SelectComboBoxItem(statisticsWindow, "StatisticsDateSelector", seed.Yesterday.ToString("yyyy-MM-dd"));
 
-        var total = harness.WaitForAutomationId(statisticsWindow, "StatisticsTotalDuration", TimeSpan.FromSeconds(5));
-        Assert.Equal("当日总时长", total.Current.Name);
+        Assert.Equal(
+            "2 小时 15 分钟",
+            harness.WaitForAutomationName(
+                statisticsWindow,
+                "StatisticsTotalDuration",
+                name => name == "2 小时 15 分钟",
+                TimeSpan.FromSeconds(5)));
         var applications = harness.WaitForListItemNames(
             statisticsWindow, "StatisticsApplicationList", 2, TimeSpan.FromSeconds(5));
         Assert.Contains("BrowserApp", applications[0]);
@@ -95,8 +100,13 @@ public sealed class UsageStatisticsWindowUiTests
             OpenStatistics(harness, petWindow);
             var statisticsWindow = harness.WaitForTopLevelWindow("UsageStatisticsWindow", TimeSpan.FromSeconds(5));
 
-            var errorState = harness.WaitForAutomationId(statisticsWindow, "StatisticsErrorState", TimeSpan.FromSeconds(5));
-            Assert.Equal("统计错误状态", errorState.Current.Name);
+            Assert.Contains(
+                "不可用",
+                harness.WaitForAutomationName(
+                    statisticsWindow,
+                    "StatisticsErrorState",
+                    name => name.Contains("不可用", StringComparison.Ordinal),
+                    TimeSpan.FromSeconds(5)));
             harness.WaitForAutomationIdToDisappear(statisticsWindow, "StatisticsEmptyState", TimeSpan.FromSeconds(2));
             Assert.False(harness.WaitForPetWindow(TimeSpan.FromSeconds(1)).Current.IsOffscreen);
         }
@@ -162,6 +172,21 @@ public sealed class UsageStatisticsWindowUiTests
         Assert.True(harness.IsProcessRunning);
     }
 
+    // Purpose: Keep all seeded date calculations on one local-date baseline captured at construction.
+    // Coverage: Explicit local-date baseline, Yesterday, DayBeforeYesterday, and YesterdayStartUtc.
+    // Target effect: Repeated seed properties remain anchored to the supplied construction date.
+    [Fact]
+    [Trait("Category", "Ui")]
+    public void Usage_statistics_seed_uses_fixed_local_date_baseline()
+    {
+        using var seed = new UsageStatisticsSeed(new DateOnly(2000, 1, 15));
+
+        Assert.Equal(new DateOnly(2000, 1, 14), seed.Yesterday);
+        Assert.Equal(new DateOnly(2000, 1, 13), seed.DayBeforeYesterday);
+        Assert.Equal(
+            new DateOnly(2000, 1, 14),
+            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(seed.YesterdayStartUtc, TimeZoneInfo.Local).DateTime));
+    }
     private static void OpenStatistics(DesktopPuppyUiHarness harness, System.Windows.Automation.AutomationElement petWindow)
     {
         harness.Invoke(harness.FindByAutomationId(petWindow, "StatisticsButton"));
