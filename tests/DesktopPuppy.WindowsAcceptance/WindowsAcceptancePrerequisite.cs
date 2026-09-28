@@ -11,12 +11,23 @@ internal static class WindowsAcceptancePrerequisite
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
 
+    internal static string? SessionSkipReason() => SessionSkipReason(
+        Environment.GetEnvironmentVariable("DESKTOP_PUPPY_WINDOWS_ACCEPTANCE"),
+        Environment.UserInteractive,
+        GetSystemMetrics(SmRemoteSession));
+
+    internal static string? SessionSkipReason(string? optIn, bool userInteractive, int remoteSessionMetric)
+    {
+        if (optIn != "1")
+            return "Opt-in is not enabled (DESKTOP_PUPPY_WINDOWS_ACCEPTANCE must be 1).";
+        if (!userInteractive || remoteSessionMetric != 0)
+            return "A local interactive Windows session is required.";
+        return null;
+    }
     internal static string? SkipReason()
     {
-        if (Environment.GetEnvironmentVariable("DESKTOP_PUPPY_WINDOWS_ACCEPTANCE") != "1")
-            return "Opt-in is not enabled (DESKTOP_PUPPY_WINDOWS_ACCEPTANCE must be 1).";
-        if (!Environment.UserInteractive || GetSystemMetrics(SmRemoteSession) != 0)
-            return "A local interactive Windows session is required.";
+        var sessionReason = SessionSkipReason();
+        if (sessionReason is not null) return sessionReason;
         var executable = Environment.GetEnvironmentVariable("DESKTOP_PUPPY_EXE");
         if (string.IsNullOrWhiteSpace(executable) || !Path.IsPathFullyQualified(executable) ||
             !string.Equals(Path.GetFileName(executable), "DesktopPuppy.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable))

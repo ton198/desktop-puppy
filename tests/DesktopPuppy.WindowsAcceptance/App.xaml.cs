@@ -11,7 +11,7 @@ public partial class App : Application
         if (e.Args.Length == 3 && e.Args[0] == "--fixture")
         {
             // Fixture windows are only a visible shell in Task 1; no product is launched.
-            if (Environment.GetEnvironmentVariable("DESKTOP_PUPPY_WINDOWS_ACCEPTANCE") != "1")
+            if (WindowsAcceptancePrerequisite.SessionSkipReason() is not null)
             {
                 Shutdown();
                 return;

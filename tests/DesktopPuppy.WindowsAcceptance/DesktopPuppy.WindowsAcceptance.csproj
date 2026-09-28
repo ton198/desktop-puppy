@@ -8,6 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DesktopPuppy.Tests" />
     <ProjectReference Include="..\..\src\DesktopPuppy\DesktopPuppy.csproj" />
     <ProjectReference Include="..\DesktopPuppy.WindowsAcceptance.Core\DesktopPuppy.WindowsAcceptance.Core.csproj" />
   </ItemGroup>
