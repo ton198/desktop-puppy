@@ -39,7 +39,8 @@ public sealed class SessionBoundaryValidator
         var fixtureB = fixtureSessions.Where(s => s.ProcessId == fixtureProcessIds.FixtureBProcessId &&
             s.StartedAt < s.EndedAt && s.EndedAt >= operatorCompletedAt - LockBoundaryTolerance &&
             s.EndedAt <= operatorCompletedAt).ToArray();
-        var closedBySwitch = resumedA.Any(a => fixtureB.Any(b => b.StartedAt >= a.EndedAt && b.StartedAt < operatorCompletedAt));
+        var closedBySwitch = resumedA.Any(a => fixtureB.Any(b => b.StartedAt >= a.EndedAt &&
+            b.StartedAt - a.EndedAt <= LockBoundaryTolerance && b.StartedAt < operatorCompletedAt));
 
         return preLock.Length > 0 && resumedA.Length > 0 && fixtureB.Length > 0 && closedBySwitch
             ? Result(AcceptanceStatus.Passed, "Real lock/unlock notifications and closed fixture session boundaries verified.")

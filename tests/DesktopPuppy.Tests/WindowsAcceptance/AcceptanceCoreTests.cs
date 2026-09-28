@@ -77,6 +77,9 @@ public sealed class AcceptanceCoreTests
         Assert.Equal(AcceptanceStatus.Passed, validator.ValidateLockUnlock(
             events, edgeAtTolerance, Fixtures, T.AddSeconds(40), true).Status);
 
+        var switchAtTolerance = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 35, 40) };
+        Assert.Equal(AcceptanceStatus.Passed, validator.ValidateLockUnlock(
+            events, switchAtTolerance, Fixtures, T.AddSeconds(45), true).Status);
         var spansLockedTooLong = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 12, 18), S(202, 31, 35) };
         Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
             events, spansLockedTooLong, Fixtures, T.AddSeconds(40), true).Status);
@@ -86,6 +89,18 @@ public sealed class AcceptanceCoreTests
         var bClosedTooEarly = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 31, 34) };
         Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
             events, bClosedTooEarly, Fixtures, T.AddSeconds(40), true).Status);
+    }
+    // Purpose: ensure a later fixture-B row cannot retroactively prove it closed fixture A.
+    // Coverage: resumed A closes ten seconds before B starts; controller confirmation follows B close.
+    // Target effect: a gap greater than the lock boundary tolerance returns Failed.
+    [Fact]
+    public void Lock_verdict_rejects_large_gap_between_fixture_a_and_b()
+    {
+        var events = new[] { E(ObservedSystemEventKind.Locked, 10), E(ObservedSystemEventKind.Unlocked, 20) };
+        var sessions = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 40, 45) };
+
+        Assert.Equal(AcceptanceStatus.Failed, new SessionBoundaryValidator().ValidateLockUnlock(
+            events, sessions, Fixtures, T.AddSeconds(50), true).Status);
     }
     // Purpose: validate the bounded manual-step deadline before a run starts.
     // Coverage: default, minimum, maximum, below-range, above-range, and malformed values.
