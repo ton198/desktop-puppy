@@ -1,0 +1,6 @@
+<Window x:Class="DesktopPuppy.WindowsAcceptance.ForegroundFixtureWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Desktop Puppy Acceptance Target" Width="420" Height="180">
+  <TextBlock Text="Desktop Puppy acceptance foreground target" Margin="24" />
+</Window>

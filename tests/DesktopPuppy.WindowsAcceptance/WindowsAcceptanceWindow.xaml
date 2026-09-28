@@ -5,7 +5,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="24">
       <TextBlock Text="Windows session and power acceptance" FontSize="22" FontWeight="Bold" Margin="0,0,0,12"/>
-      <TextBlock Text="Manual, opt-in acceptance only. No button locks or sleeps the machine. Task 1 is an instructions shell; it does not launch the product, fixtures, or observe system events." TextWrapping="Wrap" Margin="0,0,0,14"/>
+      <TextBlock Text="Manual, opt-in acceptance only. No button locks or sleeps the machine. Task 2 launches isolated targets and observes real notifications, but cannot pass either scenario until later manual steps and persisted-boundary checks are implemented." TextWrapping="Wrap" Margin="0,0,0,14"/>
       <TextBlock Text="Purpose: verify product usage-session boundaries across real Windows transitions." TextWrapping="Wrap"/>
       <TextBlock Text="Coverage: manual lock/unlock or suspend/resume, then foreground changes between fixtures." TextWrapping="Wrap" Margin="0,4,0,0"/>
       <TextBlock Text="Target effect: fixture A is the required first target; fixture B closes the resumed session. Do not begin the system transition until fixture A is foreground." TextWrapping="Wrap" Margin="0,4,0,16"/>
