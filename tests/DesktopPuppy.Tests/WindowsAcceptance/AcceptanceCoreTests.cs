@@ -1,3 +1,4 @@
+using DesktopPuppy.WindowsAcceptance;
 using DesktopPuppy.WindowsAcceptance.Core;
 using Xunit;
 
@@ -60,8 +61,48 @@ public sealed class AcceptanceCoreTests
         Assert.Equal(AcceptanceStatus.Passed, validator.ValidateLockUnlock(events, ClosedSessions(), Fixtures, T.AddSeconds(40), true).Status);
         Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(events, new[] { S(101, 0, 10), S(202, 25, 45) }, Fixtures, T.AddSeconds(40), true).Status);
         Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(events, ClosedSessions(), Fixtures, T.AddSeconds(29), true).Status);
+        var withinTolerance = new[] { S(101, 0, 11), S(101, 15, 30), S(202, 31, 35) };
+        Assert.Equal(AcceptanceStatus.Passed, validator.ValidateLockUnlock(events, withinTolerance, Fixtures, T.AddSeconds(40), true).Status);
     }
 
+    // Purpose: enforce lock/unlock tolerance and reject sessions that continue through the locked interval.
+    // Coverage: five-second lock/unlock edge tolerance and over-tolerance locked-time overlap.
+    // Target effect: only boundaries within the documented tolerance may pass.
+    [Fact]
+    public void Lock_verdict_applies_five_second_boundary_tolerance()
+    {
+        var validator = new SessionBoundaryValidator();
+        var events = new[] { E(ObservedSystemEventKind.Locked, 10), E(ObservedSystemEventKind.Unlocked, 20) };
+        var edgeAtTolerance = new[] { S(101, 0, 15), S(101, 15, 30), S(202, 31, 35) };
+        Assert.Equal(AcceptanceStatus.Passed, validator.ValidateLockUnlock(
+            events, edgeAtTolerance, Fixtures, T.AddSeconds(40), true).Status);
+
+        var spansLockedTooLong = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 12, 18), S(202, 31, 35) };
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
+            events, spansLockedTooLong, Fixtures, T.AddSeconds(40), true).Status);
+        var latePreLockClose = new[] { S(101, 0, 16), S(101, 25, 30), S(202, 31, 35) };
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
+            events, latePreLockClose, Fixtures, T.AddSeconds(40), true).Status);
+        var bClosedTooEarly = new[] { S(101, 0, 10), S(101, 25, 30), S(202, 31, 34) };
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
+            events, bClosedTooEarly, Fixtures, T.AddSeconds(40), true).Status);
+    }
+    // Purpose: validate the bounded manual-step deadline before a run starts.
+    // Coverage: default, minimum, maximum, below-range, above-range, and malformed values.
+    // Target effect: only a 1–120 minute timeout is accepted; invalid input cannot start a run.
+    [Fact]
+    public void Step_timeout_defaults_to_thirty_minutes_and_accepts_only_one_to_one_hundred_twenty()
+    {
+        Assert.True(AcceptanceStepTimeout.TryRead(null, out var defaultTimeout));
+        Assert.Equal(TimeSpan.FromMinutes(30), defaultTimeout);
+        Assert.True(AcceptanceStepTimeout.TryRead("1", out var minimum));
+        Assert.Equal(TimeSpan.FromMinutes(1), minimum);
+        Assert.True(AcceptanceStepTimeout.TryRead("120", out var maximum));
+        Assert.Equal(TimeSpan.FromMinutes(120), maximum);
+        Assert.False(AcceptanceStepTimeout.TryRead("0", out _));
+        Assert.False(AcceptanceStepTimeout.TryRead("121", out _));
+        Assert.False(AcceptanceStepTimeout.TryRead("thirty", out _));
+    }
     // Purpose: prove legitimate suspend/resume only from ordered observations and closed sessions.
     // Coverage: Suspend then Resume, pre/post fixture sessions and operator completion.
     // Target effect: a correct split returns Passed.
@@ -103,6 +144,8 @@ public sealed class AcceptanceCoreTests
     public void Missing_or_reordered_system_event_is_failed()
     {
         var validator = new SessionBoundaryValidator();
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateLockUnlock(
+            new[] { E(ObservedSystemEventKind.Unlocked, 10) }, ClosedSessions(), Fixtures, T.AddSeconds(40), true).Status);
         foreach (var events in new[] {
             new[] { E(ObservedSystemEventKind.Locked, 10) },
             new[] { E(ObservedSystemEventKind.Unlocked, 10), E(ObservedSystemEventKind.Locked, 20) } })
