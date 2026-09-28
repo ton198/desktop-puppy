@@ -245,6 +245,15 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             $"List '{listAutomationId}' did not contain {expectedCount} items. Last items: {string.Join(" | ", lastNames)}");
     }
 
+    public IReadOnlyList<string> ReadListItemNames(AutomationElement root, string listAutomationId)
+    {
+        var list = FindByAutomationId(root, listAutomationId);
+        var items = list.FindAll(
+            TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem));
+        return items.Cast<AutomationElement>().Select(ReadListItemText).ToArray();
+    }
+
     public void SelectComboBoxItem(AutomationElement root, string comboAutomationId, string itemName)
     {
         var combo = FindByAutomationId(root, comboAutomationId);

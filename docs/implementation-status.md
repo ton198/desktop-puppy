@@ -586,3 +586,32 @@ The UI test project must run on an interactive Windows desktop and requires `DES
 - Complete native monitor/work-area enumeration and connect DPI geometry policy to the production WPF placement path; verify mixed-DPI movement, monitor removal, and edge clamping on hardware or an equivalent Windows setup.
 - Run a dedicated two-process check that a second launch activates the first pet.
 - Remaining broader PRD work includes fullscreen detection, tray/startup registration, settings persistence/deletion, and AI/report features. The full PRD acceptance matrix is not complete.
+
+## Real 30-second statistics refresh E2E — 2026-09-28
+
+Added one real-process, real-WPF long-running UI test (`tests/DesktopPuppy.UiTests/UsageStatisticsRefreshE2ETests.cs`) whose purpose is to prove that an already-open statistics window refreshes new SQLite data through its own product timer, not a manual query, activation, reopen, or restart. A read-only `ReadListItemNames` snapshot helper was added to `tests/DesktopPuppy.UiTests/DesktopPuppyUiHarness.cs`; no product, schema, timer interval, default filter, or README change was made.
+
+Verified on an interactive Windows desktop in the isolated worktree `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy` (branch `codex/windows-e2e-acceptance`, baseline `6daab2a`):
+
+```powershell
+dotnet build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release
+$env:DESKTOP_PUPPY_EXE = (Resolve-Path 'src/DesktopPuppy/bin/Release/net10.0-windows/DesktopPuppy.exe').Path
+dotnet build tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release
+dotnet test tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release --no-build --filter "Category=LongRunningE2E"
+dotnet test tests/DesktopPuppy.UiTests/DesktopPuppy.UiTests.csproj --configuration Release --no-build --filter "Category=Ui"
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release
+```
+
+Observed:
+
+```text
+Release app build: 0 warnings, 0 errors
+Release UI test build: 0 warnings, 0 errors
+Category=LongRunningE2E: 1 passed, 0 failed (33 s)
+Category=Ui: 11 passed, 0 failed (21 s; excludes the long-running case)
+Unit tests: 101 passed, 0 failed
+```
+
+`Statistics_window_refreshes_new_sqlite_data_on_its_real_timer` seeds `Yesterday` 09:00 local for 30 minutes of `BrowserApp`, waits for the displayed total `0 小时 30 分钟`, then appends a closed 15-minute `RefreshProbeApp` row on the same local date through a separate SQLite connection while the real window stays open. It then polls only Automation ID names read-only for at most 60 seconds, confirming `0 小时 45 分钟` and the `RefreshProbeApp` application row, with the pet process still running, the statistics window onscreen, and exactly one `UsageStatisticsWindow`. The 33-second run reflects the product's real 30-second `DispatcherTimer`; no focus, activation, reopen, or invocation occurs after the second insert.
+
+This test verifies the timer-driven statistics refresh only. It does not verify operating-system lock/power notification delivery or monitor/DPI behavior, and the broader PRD acceptance matrix remains incomplete.
