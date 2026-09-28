@@ -17,5 +17,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DesktopPuppy\DesktopPuppy.csproj" />
+    <ProjectReference Include="..\DesktopPuppy.WindowsAcceptance.Core\DesktopPuppy.WindowsAcceptance.Core.csproj" />
   </ItemGroup>
 </Project>
