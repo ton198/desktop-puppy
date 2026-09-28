@@ -51,6 +51,24 @@ The isolated app uses a private owned database and two distinct fixture processe
 - **Incomplete:** the operator has not completed the required manual transitions before the deadline, or cancels; this can never pass.
 - **Skipped:** opt-in/session/product prerequisites are unmet; this can never pass.
 
-The optional `DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES` setting defaults to 30 minutes and accepts 1–120 whole minutes. The same setting is intended for the later suspend/resume manual flow, but that scenario is deliberately not runnable in this Task 3 build; do not use it as an acceptance result yet.
+The optional `DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES` setting defaults to 30 minutes and accepts 1–120 whole minutes. The lock flow measures its deadline normally. The suspend/resume flow measures awake time: its remaining deadline is paused on the observed Suspend notification and resumes on the observed Resume notification, so the time asleep does not cause a timeout.
 
 On cancel or completion, the run closes its event observer and owned child-process handles before stopping its fixture/product children and deleting only its own temporary directory. If an owned child cannot be closed, cleanup retains the directory for safety. The unrelated DesktopPuppy instance, user data, and neighboring temp files are never cleaned up.
+
+## E2E-POWER-02 — Real suspend/resume session split
+
+**Purpose:** Verify actual Windows Suspend/Resume notifications reach the app and collection restarts after the machine resumes.
+
+**Coverage:** Pre-suspend fixture-A session, operator-initiated system suspend/wake, optional manual unlock, post-resume A-to-B-to-controller transitions, and isolated SQLite boundaries for both fixture PIDs.
+
+**Target effect:** Pre-suspend fixture A closes within 15 seconds of Suspend; no fixture usage overlaps the suspended interval by more than 15 seconds; a post-resume fixture-A session begins no earlier than 15 seconds before Resume and closes on the A-to-B switch; fixture B closes within 15 seconds before controller confirmation. Results use generic Suspend/Resume wording and do not distinguish sleep from hibernate.
+
+### Manual suspend/resume steps
+
+1. Save unrelated work. Choose **Run suspend/resume acceptance**, review Purpose, Coverage, Target effect, and the awake-time deadline, then choose **Begin isolated suspend/resume scenario**.
+2. Focus fixture A. The operator alone manually puts Windows to sleep; the utility does not initiate a system transition or change power settings.
+3. Wake Windows yourself. Unlock/sign in if requested. The deadline pauses after the actual Suspend notification and resumes after the actual Resume notification.
+4. After the controller observes ordered Suspend then Resume, focus fixture A, switch to fixture B to close A's resumed session, then return to the controller and confirm.
+5. Cancel or allow the awake-time deadline to expire to produce **Incomplete**, never **Passed**. A pass requires both real notifications, closed persisted boundaries, and operator confirmation.
+
+Builds and existing unit/UI tests do not launch this manual flow or perform a system transition. Real Windows suspend/resume verification remains **Not run** until an operator completes the steps above.

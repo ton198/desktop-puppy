@@ -137,7 +137,7 @@ public sealed class AcceptanceCoreTests
     {
         Assert.Equal(AcceptanceStatus.Failed, new SessionBoundaryValidator().ValidateSuspendResume(
             new[] { E(ObservedSystemEventKind.Suspend, 10), E(ObservedSystemEventKind.Resume, 20) },
-            new[] { S(101, 0, 15), S(101, 25, 30), S(202, 31, 35) }, Fixtures, T.AddSeconds(40), true).Status);
+            new[] { S(101, 0, 26), S(101, 25, 30), S(202, 31, 35) }, Fixtures, T.AddSeconds(40), true).Status);
     }
 
     // Purpose: do not report acceptance when the manual step is skipped.
@@ -171,6 +171,54 @@ public sealed class AcceptanceCoreTests
             Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(events, ClosedSessions(), Fixtures, T.AddSeconds(40), true).Status);
     }
 
+    // Purpose: enforce the suspend-specific 15-second boundaries without changing lock verdicts.
+    // Coverage: exact pre-suspend/resume/fixture-B edges, excessive overlap, missing events, order, and cancellation.
+    // Target effect: only a correctly closed A-to-B session split returns Passed.
+    [Fact]
+    public void Suspend_verdict_enforces_fifteen_second_edges_and_rejects_invalid_flows()
+    {
+        var validator = new SessionBoundaryValidator();
+        var events = new[] { E(ObservedSystemEventKind.Suspend, 20), E(ObservedSystemEventKind.Resume, 40) };
+        var atBoundaries = new[] { S(101, 0, 35), S(101, 25, 50), S(202, 51, 55) };
+        Assert.Equal(AcceptanceStatus.Passed, validator.ValidateSuspendResume(
+            events, atBoundaries, Fixtures, T.AddSeconds(70), true).Status);
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(
+            events, new[] { S(101, 0, 36), S(101, 25, 50), S(202, 51, 55) }, Fixtures, T.AddSeconds(70), true).Status);
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(
+            events, new[] { S(101, 0, 35), S(101, 25, 50), S(202, 51, 54) }, Fixtures, T.AddSeconds(70), true).Status);
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(
+            events, new[] { S(101, 0, 20), S(101, 25, 50), S(202, 51, 55), S(202, 0, 36) }, Fixtures, T.AddSeconds(70), true).Status);
+        Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(
+            new[] { E(ObservedSystemEventKind.Resume, 20), E(ObservedSystemEventKind.Suspend, 40) },
+            atBoundaries, Fixtures, T.AddSeconds(70), true).Status);
+        Assert.Equal(AcceptanceStatus.Incomplete, validator.ValidateSuspendResume(
+            events, atBoundaries, Fixtures, T.AddSeconds(70), false).Status);
+    }
+
+    // Purpose: prove a suspended interval does not consume an awake-step timeout.
+    // Coverage: deterministic elapsed awake time around pause and resume transitions.
+    // Target effect: only awake duration reduces the remaining timeout budget.
+    [Fact]
+    public void Awake_timeout_budget_excludes_suspended_duration()
+    {
+        var clock = new ManualTimeProvider();
+        var budget = new AcceptanceAwakeTimeBudget(TimeSpan.FromMinutes(2), clock);
+        clock.Advance(TimeSpan.FromSeconds(30));
+        budget.Pause();
+        clock.Advance(TimeSpan.FromHours(3));
+        Assert.True(budget.IsPaused);
+        budget.Resume();
+        clock.Advance(TimeSpan.FromSeconds(45));
+        Assert.Equal(TimeSpan.FromSeconds(45), budget.Remaining);
+    }
+
+    private sealed class ManualTimeProvider : TimeProvider
+    {
+        private long timestamp;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => timestamp;
+        public void Advance(TimeSpan elapsed) => timestamp += elapsed.Ticks;
+    }
     private static ObservedSystemEvent E(ObservedSystemEventKind kind, int second) => new(kind, T.AddSeconds(second));
     private static ObservedUsageSession S(uint pid, int start, int end) => new(pid, T.AddSeconds(start), T.AddSeconds(end));
     private static ObservedUsageSession[] ClosedSessions() => new[] { S(101, 0, 10), S(101, 25, 30), S(202, 31, 35) };

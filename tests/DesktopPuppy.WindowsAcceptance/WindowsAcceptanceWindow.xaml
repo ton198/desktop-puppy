@@ -13,7 +13,7 @@
       <TextBlock x:Name="ScenarioSummary" Text="Choose a scenario to view Purpose, Coverage, and Target effect." TextWrapping="Wrap" Margin="0,0,0,8"/>
       <TextBlock x:Name="Instructions" Text="Choose a scenario to view its manual instructions." TextWrapping="Wrap" Margin="0,0,0,16"/>
       <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-        <Button x:Name="BeginButton" Content="Begin isolated lock scenario" Click="Begin" IsEnabled="False" Padding="12,6" Margin="0,0,12,0"/>
+        <Button x:Name="BeginButton" Content="Begin isolated scenario" Click="Begin" IsEnabled="False" Padding="12,6" Margin="0,0,12,0"/>
         <Button x:Name="CompleteButton" Content="Confirm fixture switches complete" Click="Complete" IsEnabled="False" Padding="12,6" Margin="0,0,12,0"/>
         <Button x:Name="CancelButton" Content="Cancel" Click="Cancel" IsEnabled="False" Padding="12,6"/>
       </StackPanel>

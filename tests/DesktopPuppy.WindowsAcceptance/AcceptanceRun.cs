@@ -20,6 +20,8 @@ public sealed class AcceptanceRun : IAsyncDisposable
     private readonly string acceptanceProcessName;
     private readonly SemaphoreSlim eventSignal = new(0, 1);
     private readonly TaskCompletionSource<DateTimeOffset> lockUnlockConfirmation = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<DateTimeOffset> suspendResumeConfirmation = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private AcceptanceAwakeTimeBudget? suspendResumeDeadline;
     private readonly SemaphoreSlim disposalGate = new(1, 1);
     private bool disposed;
 
@@ -99,9 +101,10 @@ public sealed class AcceptanceRun : IAsyncDisposable
             source.Start((kind, at) =>
             {
                 observer.Record(kind, at);
+                if (kind == SessionPowerEvent.Suspend) run.suspendResumeDeadline?.Pause();
+                else if (kind == SessionPowerEvent.Resume) run.suspendResumeDeadline?.Resume();
                 run.EventsChanged?.Invoke(observer.Snapshot());
-                try { run.eventSignal.Release(); }
-                catch (SemaphoreFullException) { /* Coalesce excess notifications; the observer retains all events. */ }
+                run.SignalEventWaiter();
             });
             return Task.FromResult(run);
         }
@@ -182,19 +185,109 @@ public sealed class AcceptanceRun : IAsyncDisposable
         lockUnlockConfirmation.TrySetResult(completedAt);
     }
 
-    // Purpose: preserve the separate suspend/resume scenario entry point for Task 4.
-    // Coverage: this Task 3 build does not collect suspend/resume operator input.
-    // Target effect: no incomplete suspend/resume scenario may pass.
-    public Task<AcceptanceResult> RunSuspendResumeAsync(CancellationToken cancellationToken) => NotImplementedAsync(cancellationToken);
-
-    private Task<AcceptanceResult> NotImplementedAsync(CancellationToken cancellationToken)
+    // Purpose: prove real Suspend/Resume notifications split only isolated fixture sessions.
+    // Coverage: ordered events, 15-second persisted-session edges, fixture A-to-B switching, and operator confirmation.
+    // Target effect: only a completed manual flow with closed session boundaries can pass.
+    public async Task<AcceptanceResult> RunSuspendResumeAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ObjectDisposedException.ThrowIf(disposed, this);
-        // Task 4 adds the suspend/resume operator flow; events alone cannot pass.
-        return Task.FromResult(observer.NotImplementedResult());
+        suspendResumeDeadline = new AcceptanceAwakeTimeBudget(StepTimeout);
+        var pendingStep = "the Windows Suspend notification";
+        try
+        {
+            while (!HasOrderedSuspendResumeNotifications(observer.Snapshot()))
+            {
+                var events = observer.Snapshot();
+                if (HasInvalidSuspendResumeOrder(events))
+                    return new AcceptanceResult(AcceptanceStatus.Failed,
+                        "Real Suspend/Resume notifications were repeated or out of order.", events, Array.Empty<string>());
+                pendingStep = events.Any(e => e.Kind == ObservedSystemEventKind.Suspend)
+                    ? "the Windows Resume notification"
+                    : "the Windows Suspend notification";
+                await WaitForSuspendStepSignalAsync(cancellationToken);
+            }
+
+            pendingStep = "fixture A-to-B switching and controller confirmation";
+            var completedAt = await WaitForSuspendStepConfirmationAsync(cancellationToken);
+            using var store = new UsageSqliteStore(owner.DatabasePath);
+            var sessions = store.ReadSessions()
+                .Where(session => (session.ProcessId == FixtureIds.FixtureAProcessId ||
+                    session.ProcessId == FixtureIds.FixtureBProcessId) &&
+                    string.Equals(session.ProcessName, acceptanceProcessName, StringComparison.OrdinalIgnoreCase) &&
+                    session.EndedAt is not null)
+                .Select(session => new ObservedUsageSession(session.ProcessId, session.StartedAt, session.EndedAt!.Value))
+                .ToArray();
+            return new SessionBoundaryValidator().ValidateSuspendResume(
+                observer.Snapshot(), sessions, FixtureIds, completedAt, operatorConfirmed: true);
+        }
+        catch (OperationCanceledException)
+        {
+            return new AcceptanceResult(AcceptanceStatus.Incomplete,
+                $"Operator cancelled while waiting for {pendingStep}; no acceptance verdict was produced.",
+                observer.Snapshot(), [$"Pending step: {pendingStep}."]);
+        }
+        catch (TimeoutException)
+        {
+            return new AcceptanceResult(AcceptanceStatus.Incomplete,
+                $"Awake-time deadline expired while waiting for {pendingStep}; no acceptance verdict was produced.",
+                observer.Snapshot(), [$"Pending step: {pendingStep}."]);
+        }
+        finally { suspendResumeDeadline = null; }
     }
 
+    public void ConfirmSuspendResumeCompletion(DateTimeOffset completedAt)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (suspendResumeConfirmation.TrySetResult(completedAt)) SignalEventWaiter();
+    }
+
+    private void SignalEventWaiter()
+    {
+        try { eventSignal.Release(); }
+        catch (SemaphoreFullException) { /* Coalesce excess notifications; the observer retains all events. */ }
+    }
+    private async Task WaitForSuspendStepSignalAsync(CancellationToken cancellationToken)
+    {
+        var deadline = suspendResumeDeadline!;
+        if (deadline.IsPaused)
+        {
+            await eventSignal.WaitAsync(cancellationToken);
+            return;
+        }
+        if (!await eventSignal.WaitAsync(deadline.Remaining, cancellationToken) && deadline.Remaining <= TimeSpan.Zero)
+            throw new TimeoutException();
+    }
+
+    private async Task<DateTimeOffset> WaitForSuspendStepConfirmationAsync(CancellationToken cancellationToken)
+    {
+        var deadline = suspendResumeDeadline!;
+        while (!suspendResumeConfirmation.Task.IsCompleted)
+        {
+            if (deadline.IsPaused)
+            {
+                await eventSignal.WaitAsync(cancellationToken);
+                continue;
+            }
+            if (!await eventSignal.WaitAsync(deadline.Remaining, cancellationToken) && deadline.Remaining <= TimeSpan.Zero)
+                throw new TimeoutException();
+        }
+        return await suspendResumeConfirmation.Task;
+    }
+
+    private static bool HasOrderedSuspendResumeNotifications(IReadOnlyList<ObservedSystemEvent> events)
+    {
+        var relevant = events.Where(e => e.Kind is ObservedSystemEventKind.Suspend or ObservedSystemEventKind.Resume).ToArray();
+        return relevant.Length == 2 && relevant[0].Kind == ObservedSystemEventKind.Suspend &&
+            relevant[1].Kind == ObservedSystemEventKind.Resume && relevant[0].At < relevant[1].At;
+    }
+
+    private static bool HasInvalidSuspendResumeOrder(IReadOnlyList<ObservedSystemEvent> events)
+    {
+        var relevant = events.Where(e => e.Kind is ObservedSystemEventKind.Suspend or ObservedSystemEventKind.Resume).ToArray();
+        return relevant.Length > 0 && relevant[0].Kind != ObservedSystemEventKind.Suspend ||
+            relevant.Length >= 2 && !HasOrderedSuspendResumeNotifications(events);
+    }
     private static bool HasOrderedLockNotifications(IReadOnlyList<ObservedSystemEvent> events)
     {
         var relevant = events.Where(e => e.Kind is ObservedSystemEventKind.Locked or ObservedSystemEventKind.Unlocked).ToArray();
@@ -301,12 +394,66 @@ public sealed class AcceptanceEventRecorder
         lock (gate) events.Add(new ObservedSystemEvent(mapped.Value, at));
     }
 
+    public AcceptanceResult NotImplementedResult() => new(AcceptanceStatus.Incomplete,
+        "Manual steps and persisted session boundary validation are not yet implemented; no acceptance verdict was produced.",
+        Snapshot(), Array.Empty<string>());
     public IReadOnlyList<ObservedSystemEvent> Snapshot()
     {
         lock (gate) return events.ToArray();
     }
 
-    public AcceptanceResult NotImplementedResult() => new(AcceptanceStatus.Incomplete,
-        "Manual steps and persisted session boundary validation are not yet implemented; no acceptance verdict was produced.",
-        Snapshot(), Array.Empty<string>());
+
+}
+
+internal sealed class AcceptanceAwakeTimeBudget
+{
+    private readonly object gate = new();
+    private readonly TimeProvider clock;
+    private TimeSpan remaining;
+    private long runningSince;
+    private bool paused;
+
+    internal AcceptanceAwakeTimeBudget(TimeSpan timeout, TimeProvider? clock = null)
+    {
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+        this.clock = clock ?? TimeProvider.System;
+        remaining = timeout;
+        runningSince = this.clock.GetTimestamp();
+    }
+
+    internal bool IsPaused { get { lock (gate) return paused; } }
+
+    internal TimeSpan Remaining
+    {
+        get
+        {
+            lock (gate)
+            {
+                if (paused) return remaining;
+                var elapsed = clock.GetElapsedTime(runningSince);
+                return elapsed >= remaining ? TimeSpan.Zero : remaining - elapsed;
+            }
+        }
+    }
+
+    internal void Pause()
+    {
+        lock (gate)
+        {
+            if (paused) return;
+            var elapsed = clock.GetElapsedTime(runningSince);
+            remaining = elapsed >= remaining ? TimeSpan.Zero : remaining - elapsed;
+            paused = true;
+        }
+    }
+
+    internal void Resume()
+    {
+        lock (gate)
+        {
+            if (!paused) return;
+            runningSince = clock.GetTimestamp();
+            paused = false;
+        }
+    }
 }

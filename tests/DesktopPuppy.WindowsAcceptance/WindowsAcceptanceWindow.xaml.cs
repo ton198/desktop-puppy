@@ -46,6 +46,7 @@ public partial class WindowsAcceptanceWindow : Window
     private void ChooseLock(object sender, RoutedEventArgs e)
     {
         scenario = "lock";
+        BeginButton.Content = "Begin isolated lock scenario";
         ScenarioSummary.Text = "E2E-POWER-01 — Real lock/unlock session split.\n\n" +
             "Purpose: Verify actual Windows lock/unlock notifications reach the app and stop counting locked-screen time.\n\n" +
             "Coverage: Foreground fixture A, actual lock/unlock, observer event timestamps, product SQLite session edges, focus transitions A-to-B-to-controller, and separate PIDs for both fixtures.\n\n" +
@@ -61,19 +62,23 @@ public partial class WindowsAcceptanceWindow : Window
     private void ChoosePower(object sender, RoutedEventArgs e)
     {
         scenario = "power";
-        ScenarioSummary.Text = "Purpose: verify usage-session boundaries across actual suspend/resume notifications.\n\n" +
-            "Coverage: operator-initiated sleep/wake and fixture focus transitions, observed system-event timestamps, and persisted session edges within the configured " + stepTimeout.TotalMinutes.ToString("0") + " minute deadline.\n\n" +
-            "Target effect: suspend time is excluded and fixture usage resumes only after the real Resume notification.";
-        Instructions.Text = "The suspend/resume operator flow is reserved for Task 4 and is not runnable in this Task 3 build; do not sleep or wake the machine for this scenario.";
-        BeginButton.IsEnabled = false;
+        ScenarioSummary.Text = "E2E-POWER-02 — Real suspend/resume session split.\n\n" +
+            "Purpose: verify actual Windows Suspend/Resume notifications reach the app and collection restarts after the machine resumes.\n\n" +
+            "Coverage: pre-suspend fixture A, operator-initiated system suspend/resume, optional manual unlock, post-resume A-to-B-to-controller transitions, and isolated SQLite session boundaries for both fixture PIDs.\n\n" +
+            "Target effect: fixture sessions respect the 15-second Suspend/Resume and completion boundaries. The result reports generic Suspend/Resume and does not distinguish sleep from hibernate.";
+        Instructions.Text = "Save unrelated work first. Focus fixture A, then begin. You alone manually put Windows to sleep and wake it; unlock/sign in if requested. After Resume, focus fixture A, switch to fixture B, then return here and confirm. The awake-time deadline pauses between observed Suspend and Resume. No system transition is initiated by this utility.";
+        BeginButton.Content = "Begin isolated suspend/resume scenario";
+        BeginButton.IsEnabled = timeoutConfigurationValid;
+        CompleteButton.Content = "Confirm fixture switches complete";
         CompleteButton.IsEnabled = false;
-        ResultState.Text = AcceptanceStatus.Incomplete.ToString();
-        ResultDetail.Text = "Suspend/resume validation is not implemented in Task 3; no acceptance verdict is available.";
+        ResultState.Text = timeoutConfigurationValid ? "Not started" : AcceptanceStatus.Failed.ToString();
+        ResultDetail.Text = timeoutConfigurationValid
+            ? "No suspend, resume, unlock, or input action will be initiated by this utility."
+            : "Timeout configuration is invalid. Use a whole number from 1 to 120 minutes.";
     }
-
     private async void Begin(object sender, RoutedEventArgs e)
     {
-        if (scenario != "lock" || !CheckPrerequisites()) return;
+        if (scenario is not ("lock" or "power") || !CheckPrerequisites()) return;
         if (!AcceptanceStepTimeout.TryRead(
                 Environment.GetEnvironmentVariable("DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES"), out stepTimeout))
         {
@@ -85,7 +90,7 @@ public partial class WindowsAcceptanceWindow : Window
         LockScenario.IsEnabled = false;
         PowerScenario.IsEnabled = false;
         CancelButton.IsEnabled = true;
-        ResultState.Text = "Starting isolated lock run";
+        ResultState.Text = scenario == "lock" ? "Starting isolated lock run" : "Starting isolated suspend/resume run";
         ResultDetail.Text = "Preparing the isolated product and two fixture windows. No Windows transition is initiated.";
         startCancellation = new CancellationTokenSource();
         try
@@ -101,10 +106,14 @@ public partial class WindowsAcceptanceWindow : Window
             run = started;
             run.EventsChanged += OnEventsChanged;
             scenarioCancellation = new CancellationTokenSource();
-            ResultState.Text = "Waiting for operator lock/unlock";
-            ResultDetail.Text = $"Real Windows event observation is active. The operator alone performs lock/unlock. Deadline: {run.StepTimeout.TotalMinutes:0} minutes.";
-            UpdateLockInstructions(run.ObservedEvents);
-            pendingScenario = ObserveLockScenarioAsync(run.RunLockUnlockAsync(scenarioCancellation.Token));
+            ResultState.Text = scenario == "lock" ? "Waiting for operator lock/unlock" : "Waiting for operator Suspend/Resume";
+            ResultDetail.Text = scenario == "lock"
+                ? $"Real Windows event observation is active. The operator alone performs lock/unlock. Deadline: {run.StepTimeout.TotalMinutes:0} minutes."
+                : $"Real Windows event observation is active. The operator alone suspends and wakes Windows. Awake-time deadline: {run.StepTimeout.TotalMinutes:0} minutes.";
+            UpdateScenarioInstructions(run.ObservedEvents);
+            pendingScenario = scenario == "lock"
+                ? ObserveLockScenarioAsync(run.RunLockUnlockAsync(scenarioCancellation.Token))
+                : ObservePowerScenarioAsync(run.RunSuspendResumeAsync(scenarioCancellation.Token));
         }
         catch (AcceptanceSkippedException ex) { ShowResult(AcceptanceStatus.Skipped, ex.Message); }
         catch (OperationCanceledException) { ShowResult(AcceptanceStatus.Incomplete, "Startup cancelled; no acceptance verdict was produced."); }
@@ -140,6 +149,58 @@ public partial class WindowsAcceptanceWindow : Window
         }
     }
 
+    private async Task ObservePowerScenarioAsync(Task<AcceptanceResult> scenarioTask)
+    {
+        try
+        {
+            var result = await scenarioTask;
+            ShowResult(result.Status, result.Summary);
+        }
+        catch (Exception)
+        {
+            ShowResult(AcceptanceStatus.Failed, "Suspend/resume acceptance could not safely read or validate the owned session data.");
+        }
+        finally
+        {
+            scenarioCancellation?.Dispose();
+            scenarioCancellation = null;
+            await EndRunSafelyAsync();
+            pendingScenario = null;
+        }
+    }
+
+    private void UpdateScenarioInstructions(IReadOnlyList<ObservedSystemEvent> events)
+    {
+        if (scenario == "power") UpdatePowerInstructions(events);
+        else UpdateLockInstructions(events);
+    }
+
+    private void UpdatePowerInstructions(IReadOnlyList<ObservedSystemEvent> events)
+    {
+        var powerEvents = events.Where(e => e.Kind is ObservedSystemEventKind.Suspend or ObservedSystemEventKind.Resume).ToArray();
+        if (powerEvents.Length == 0)
+        {
+            Instructions.Text = "Save unrelated work. The operator alone manually puts Windows to sleep. Focus fixture A before suspending; awake-time deadline: " +
+                stepTimeout.TotalMinutes.ToString("0") + " minutes (paused while suspended).";
+            return;
+        }
+        if (powerEvents.Length == 1 && powerEvents[0].Kind == ObservedSystemEventKind.Suspend)
+        {
+            ResultDetail.Text = "A real Suspend notification was observed. Wake Windows yourself. The awake-time deadline remains paused until Resume.";
+            return;
+        }
+        if (powerEvents.Length == 2 && powerEvents[0].Kind == ObservedSystemEventKind.Suspend &&
+            powerEvents[1].Kind == ObservedSystemEventKind.Resume && powerEvents[0].At < powerEvents[1].At)
+        {
+            Instructions.Text = "A real Suspend then Resume notification pair was observed. Unlock/sign in yourself if requested, focus fixture A, switch to fixture B to close A's resumed session, then return here and confirm.";
+            CompleteButton.IsEnabled = true;
+            ResultDetail.Text = "Real Suspend/Resume events observed; waiting for fixture focus transitions and your confirmation.";
+        }
+        else
+        {
+            ResultDetail.Text = "Unexpected Suspend/Resume notification order. This run cannot pass.";
+        }
+    }
     private void OnEventsChanged(IReadOnlyList<ObservedSystemEvent> events)
     {
         // SystemEvents callbacks do not run on the WPF dispatcher.
@@ -147,7 +208,7 @@ public partial class WindowsAcceptanceWindow : Window
         _ = Dispatcher.BeginInvoke(() =>
         {
             if (closing || run is null) return;
-            UpdateLockInstructions(events);
+            UpdateScenarioInstructions(events);
         });
     }
 
@@ -179,11 +240,11 @@ public partial class WindowsAcceptanceWindow : Window
 
     private void Complete(object sender, RoutedEventArgs e)
     {
-        if (run is null || scenario != "lock") return;
+        if (run is null) return;
         CompleteButton.IsEnabled = false;
-        run.ConfirmLockUnlockCompletion(new SystemClock().UtcNow);
+        if (scenario == "lock") run.ConfirmLockUnlockCompletion(new SystemClock().UtcNow);
+        else if (scenario == "power") run.ConfirmSuspendResumeCompletion(new SystemClock().UtcNow);
     }
-
     private async void Cancel(object sender, RoutedEventArgs e)
     {
         startCancellation?.Cancel();
@@ -200,7 +261,7 @@ public partial class WindowsAcceptanceWindow : Window
         if (closing) return;
         ResultState.Text = status.ToString();
         ResultDetail.Text = detail;
-        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped && scenario == "lock";
+        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped && scenario is "lock" or "power";
         CompleteButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
         LockScenario.IsEnabled = status != AcceptanceStatus.Skipped;
