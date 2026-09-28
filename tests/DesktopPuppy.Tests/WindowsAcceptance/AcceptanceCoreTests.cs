@@ -171,6 +171,18 @@ public sealed class AcceptanceCoreTests
             Assert.Equal(AcceptanceStatus.Failed, validator.ValidateSuspendResume(events, ClosedSessions(), Fixtures, T.AddSeconds(40), true).Status);
     }
 
+    // Purpose: require separate fixture-A records before and after a short Suspend/Resume interval.
+    // Coverage: one A row that qualifies both predicates while staying within the overlap tolerance.
+    // Target effect: the same persisted session cannot stand in for both pre-suspend and resumed usage.
+    [Fact]
+    public void Suspend_verdict_rejects_one_a_session_reused_for_both_sides_of_a_short_interval()
+    {
+        var events = new[] { E(ObservedSystemEventKind.Suspend, 20), E(ObservedSystemEventKind.Resume, 25) };
+        var sessions = new[] { S(101, 12, 30), S(202, 31, 35) };
+
+        Assert.Equal(AcceptanceStatus.Failed, new SessionBoundaryValidator().ValidateSuspendResume(
+            events, sessions, Fixtures, T.AddSeconds(40), true).Status);
+    }
     // Purpose: enforce the suspend-specific 15-second boundaries without changing lock verdicts.
     // Coverage: exact pre-suspend/resume/fixture-B edges, excessive overlap, missing events, order, and cancellation.
     // Target effect: only a correctly closed A-to-B session split returns Passed.

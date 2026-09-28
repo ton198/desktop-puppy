@@ -77,16 +77,17 @@ public sealed class SessionBoundaryValidator
         if (fixtureSessions.Any(s => Overlap(s.StartedAt, s.EndedAt, suspendAt, resumeAt) > SuspendBoundaryTolerance))
             return Result(AcceptanceStatus.Failed, "A fixture usage session overlaps the suspended interval by more than 15 seconds.");
 
-        var preSuspendA = fixtureSessions.Any(s => s.ProcessId == fixtureProcessIds.FixtureAProcessId &&
-            s.StartedAt < suspendAt && WithinTolerance(s.EndedAt, suspendAt, SuspendBoundaryTolerance));
+        var preSuspendA = fixtureSessions.Where(s => s.ProcessId == fixtureProcessIds.FixtureAProcessId &&
+            s.StartedAt < suspendAt && WithinTolerance(s.EndedAt, suspendAt, SuspendBoundaryTolerance)).ToArray();
         var resumedA = fixtureSessions.Where(s => s.ProcessId == fixtureProcessIds.FixtureAProcessId &&
+            !preSuspendA.Any(pre => ReferenceEquals(pre, s)) &&
             s.StartedAt >= resumeAt - SuspendBoundaryTolerance && s.EndedAt < operatorCompletedAt).ToArray();
         var fixtureB = fixtureSessions.Where(s => s.ProcessId == fixtureProcessIds.FixtureBProcessId &&
             s.EndedAt >= operatorCompletedAt - SuspendBoundaryTolerance && s.EndedAt <= operatorCompletedAt).ToArray();
         var closedBySwitch = resumedA.Any(a => fixtureB.Any(b => b.StartedAt >= a.EndedAt &&
             b.StartedAt - a.EndedAt <= SuspendBoundaryTolerance && b.StartedAt < operatorCompletedAt));
 
-        return preSuspendA && resumedA.Length > 0 && fixtureB.Length > 0 && closedBySwitch
+        return preSuspendA.Length > 0 && resumedA.Length > 0 && fixtureB.Length > 0 && closedBySwitch
             ? Result(AcceptanceStatus.Passed, "Real Suspend/Resume notifications and closed fixture session boundaries verified.")
             : Result(AcceptanceStatus.Failed, "Required pre-Suspend, resumed fixture A, A-to-B switch, and fixture B session edges were not observed.");
     }
