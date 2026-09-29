@@ -10,6 +10,7 @@
         <Button x:Name="LockScenario" Content="Run lock/unlock acceptance" Click="ChooseLock" Margin="0,0,12,8" Padding="10,6"/>
         <Button x:Name="PowerScenario" Content="Run suspend/resume acceptance" Click="ChoosePower" Margin="0,0,12,8" Padding="10,6"/>
         <Button x:Name="DisplayScenarioButton" Content="Run mixed-DPI display acceptance" Click="ChooseDisplay" Margin="0,0,12,8" Padding="10,6"/>
+        <Button x:Name="DisplayRemovalScenarioButton" Content="Run monitor-removal recovery acceptance" Click="ChooseDisplayRemoval" Margin="0,0,12,8" Padding="10,6"/>
       </WrapPanel>
       <TextBlock x:Name="ScenarioSummary" Text="Choose a scenario to view Purpose, Coverage, and Target effect." TextWrapping="Wrap" Margin="0,0,0,8"/>
       <TextBlock x:Name="Instructions" Text="Choose a scenario to view its manual instructions." TextWrapping="Wrap" Margin="0,0,0,16"/>

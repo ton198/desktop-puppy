@@ -139,6 +139,36 @@ The acceptance utility does not inject input, call `SetWindowPos`, change displa
 Actual mixed-DPI hardware verification remains **Not run** until an operator performs these steps on a qualifying setup. Deterministic fake-backed tests do not count as hardware acceptance.
 
 
+## E2E-DISPLAY-02 — Monitor removal recovery
+
+**Purpose:** Prove the app re-evaluates a pet window whose display disappears and applies the documented primary fallback.
+
+**Coverage:** Pet on secondary display; operator manually disconnects/disables it; actual display-change event; refreshed monitor enumeration; captured pre-change request compared with primary-work-area policy result.
+
+**Target effect:** Actual HWND bounds match the expected fallback within 1 physical pixel, remain at least 20 physical pixels visible, and the app remains running. Visibility alone does not pass.
+
+### Prerequisites and opt-in
+
+- Windows in a local interactive desktop session (not Remote Desktop).
+- At least two enumerated connected displays. Run-local aliases put the primary first, so **Display 2** is a secondary target.
+- Set both `DESKTOP_PUPPY_WINDOWS_ACCEPTANCE=1` and `DESKTOP_PUPPY_DISPLAY_ACCEPTANCE=1`.
+- `DESKTOP_PUPPY_EXE` must be an absolute path to the Release `DesktopPuppy.exe`.
+- If another `DesktopPuppy` process is running, the scenario reports **Skipped** before creating its isolated run database or starting the child app. The existing process is left untouched.
+
+Selecting the scenario checks opt-in, local-session, executable/process, and monitor prerequisites. The checks are repeated before the isolated database is created. The operator must restore any manually removed display with Windows controls; the utility never changes or restores topology.
+
+### Manual steps and acceptance rule
+
+1. Choose **Run monitor-removal recovery acceptance** and review the displayed Purpose, Coverage, and Target effect. Choose **Begin isolated monitor-removal scenario**.
+2. Manually drag the isolated real pet window to **Display 2**. After its placement settles, press the capture button. The utility records the isolated HWND/PID, actual physical pre-removal rectangle, run-local target/primary aliases, and current primary work area. It does not inspect internal placement-service cache state.
+3. Manually disconnect or disable only **Display 2** through Windows controls. Keep the primary display connected. The controller remains responsive and waits for the actual `DisplaySettingsChanged` notification plus refreshed Native monitor enumeration showing the captured target absent, for up to **five minutes**. Cancel or timeout reports **Incomplete**; unmet prerequisites report **Skipped**.
+4. After WPF processes the topology/DPI change and the same HWND geometry settles, the utility reads its live `GetDpiForWindow` value. It converts the pet's 260×210 WPF-DIP size to physical extents, applies `PetPlacementPolicy.Clamp` to the **captured pre-removal physical left/top** and the **captured primary work area**, and independently compares that expected physical rectangle to the actual HWND bounds. The post-change bounds never redefine the request.
+5. **Passed** requires the same HWND and live isolated process, the target absent, the captured primary still connected and primary, actual HWND membership on that primary, every physical edge within **1 pixel**, and at least **20 physical pixels** visible. Merely remaining visible cannot pass. Results contain run-local aliases, DPI, and geometry only—never full device identifiers.
+6. Review the result and restore the display manually. Cleanup stops the isolated app and removes only its own run database directory after process exit is confirmed. If exit cannot be confirmed, the directory is retained for safety.
+
+The acceptance executable is not launched by builds or tests. Deterministic tests use a fake Native provider and do not alter display settings or topology. Real E2E-DISPLAY-02 hardware acceptance remains **Not run** until an operator completes the manual flow on a qualifying Windows desktop.
+
+
 ### Task 5 verification record
 
 - Cleanup regression **RED** before the fix: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --filter FullyQualifiedName~Failed_display_child_cleanup_retains_run_directory_and_disposes_provider --verbosity minimal` failed at `Assert.False(deleted)` because the unsafe cleanup path deleted the directory after stop failed.
@@ -146,3 +176,11 @@ Actual mixed-DPI hardware verification remains **Not run** until an operator per
 - Release builds: `dotnet build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release --no-restore -m:1 /nodeReuse:false` and `dotnet build tests/DesktopPuppy.WindowsAcceptance/DesktopPuppy.WindowsAcceptance.csproj --configuration Release --no-restore -m:1 /nodeReuse:false` — both succeeded with 0 warnings and 0 errors.
 - Full deterministic suite: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore -m:1 /nodeReuse:false --verbosity minimal` — 162 passed, 0 failed, 0 skipped.
 - `Category=Ui` was **Not run** because its interaction tests inject `SendInput` into the live desktop. The acceptance executable was not launched and no display hardware or topology was manipulated; E2E-DISPLAY-01 hardware acceptance is **Not run**. These automated checks do not establish real monitor/DPI behavior.
+
+### Task 6 verification record
+
+- Event-refresh regression **RED** before the retry fix: one post-capture `DisplaySettingsChanged` event followed by a transient native enumeration exception returned **Incomplete** at the bounded deadline instead of verifying the valid primary fallback; no second event was raised.
+- Event-refresh regression **GREEN** after the fix: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore --filter FullyQualifiedName~Monitor_removal_retries_transient_enumeration_failure_after_same_event` — **1 passed, 0 failed, 0 skipped**. The event-observed state remains set while fresh enumeration is retried.
+- Fresh serialized Release solution build: `dotnet build DesktopPuppy.sln --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false` — **0 warnings, 0 errors**.
+- Fresh full deterministic test project: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal` — **174 passed, 0 failed, 0 skipped**.
+- `git diff --check` — clean. `Category=Ui` was **Not run** to avoid active-desktop input injection. The acceptance utility was not launched; manual E2E-DISPLAY-02 hardware acceptance remains **Not run**. No display topology or settings were changed.

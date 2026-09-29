@@ -47,6 +47,7 @@ public partial class WindowsAcceptanceWindow : Window
         LockScenario.IsEnabled = false;
         PowerScenario.IsEnabled = false;
         CaptureDisplayButton.IsEnabled = false;
+        DisplayRemovalScenarioButton.IsEnabled = false;
         return false;
     }
 
@@ -118,6 +119,40 @@ public partial class WindowsAcceptanceWindow : Window
         DisplayScenarioButton.IsEnabled = true;
     }
 
+    private void ChooseDisplayRemoval(object sender, RoutedEventArgs e)
+    {
+        DisposeDisplayScenario();
+        scenario = "display-removal";
+        displayScenario = new DisplayAcceptanceScenario(new ReadOnlyDisplayAcceptanceNativeApi());
+        displayObservations.Clear();
+        displayPetHwnd = IntPtr.Zero;
+        displayMonitors = null;
+        BeginButton.Content = "Begin isolated monitor-removal scenario";
+        CompleteButton.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
+        ScenarioSummary.Text = "E2E-DISPLAY-02 — Monitor removal recovery.\n\n" +
+            "Purpose: Prove the app re-evaluates a pet window whose display disappears and applies the documented primary fallback.\n\n" +
+            "Coverage: Pet on secondary display; operator manually disconnects/disables it; actual display-change event; refreshed monitor enumeration; captured pre-change request compared with primary-work-area policy result.\n\n" +
+            "Target effect: Actual HWND bounds match the expected fallback within 1 physical pixel, remain at least 20 physical pixels visible, and the app remains running. Visibility alone does not pass.";
+        Instructions.Text = "Requires DESKTOP_PUPPY_WINDOWS_ACCEPTANCE=1, DESKTOP_PUPPY_DISPLAY_ACCEPTANCE=1, a local interactive Windows desktop, and at least two connected displays. After Begin, manually move the real isolated pet to Display 2 and capture its pre-removal placement. Then manually disconnect or disable only Display 2 using Windows controls. The utility never changes topology or automatically restores the display.";
+
+        var skipReason = GetDisplayPrerequisiteSkipReason();
+        if (skipReason is not null)
+        {
+            ShowResult(AcceptanceStatus.Skipped, skipReason);
+            DisposeDisplayScenario();
+            return;
+        }
+
+        ResultState.Text = "Not started";
+        ResultDetail.Text = "Display-removal prerequisites passed. No product process or run database has been created.";
+        BeginButton.IsEnabled = timeoutConfigurationValid;
+        LockScenario.IsEnabled = true;
+        PowerScenario.IsEnabled = true;
+        DisplayScenarioButton.IsEnabled = true;
+        DisplayRemovalScenarioButton.IsEnabled = true;
+    }
+
     private string? GetDisplayPrerequisiteSkipReason()
     {
         if (displayScenario is null) return "Display acceptance scenario is unavailable.";
@@ -130,12 +165,23 @@ public partial class WindowsAcceptanceWindow : Window
         if (sessionReason is not null) return sessionReason;
         var displayReason = displayScenario.CheckPrerequisites(
             windowsOptIn, displayOptIn, Environment.UserInteractive, remoteSessionMetric: 0);
-        return displayReason ?? WindowsAcceptancePrerequisite.SkipReason();
+        var prerequisiteReason = displayReason ?? WindowsAcceptancePrerequisite.SkipReason();
+        if (prerequisiteReason is not null) return prerequisiteReason;
+        if (scenario == "display-removal")
+        {
+            var monitors = displayScenario.GetMonitors();
+            var target = monitors.FirstOrDefault(item => item.Alias == "Display 2");
+            if (monitors.Count < 2 || target is null)
+                return "At least two connected displays are required and run-local Display 2 must be available; the scenario was not started.";
+            if (target.IsPrimary)
+                return "The run-local Display 2 target must be secondary; choose a different connected display topology.";
+        }
+        return null;
     }
 
     private async void Begin(object sender, RoutedEventArgs e)
     {
-        if (scenario == "display")
+        if (scenario is "display" or "display-removal")
         {
             await BeginDisplayAsync();
             return;
@@ -218,9 +264,12 @@ public partial class WindowsAcceptanceWindow : Window
         LockScenario.IsEnabled = false;
         PowerScenario.IsEnabled = false;
         DisplayScenarioButton.IsEnabled = false;
+        DisplayRemovalScenarioButton.IsEnabled = false;
         CaptureDisplayButton.IsEnabled = false;
         CancelButton.IsEnabled = true;
-        ResultState.Text = "Starting isolated mixed-DPI display run";
+        ResultState.Text = scenario == "display-removal"
+            ? "Starting isolated monitor-removal recovery run"
+            : "Starting isolated mixed-DPI display run";
         ResultDetail.Text = "Preparing a private database and one isolated Desktop Puppy process after all opt-in, session, and monitor gates.";
         startCancellation = new CancellationTokenSource();
         DisplayAcceptanceRun? candidate = null;
@@ -243,19 +292,40 @@ public partial class WindowsAcceptanceWindow : Window
             displayRun = candidate;
             candidate = null;
             displayPetHwnd = displayRun.PetHwnd;
-            displayMonitors = scenarioForRun.GetMonitors();
+            displayMonitors = scenarioForRun.RefreshMonitors();
+            if (scenario == "display-removal" &&
+                (displayMonitors.Count < 2 || displayMonitors.FirstOrDefault(item => item.Alias == "Display 2") is not { IsPrimary: false }))
+                throw new AcceptanceSkippedException("The run-local Display 2 secondary target changed before the isolated run was ready.");
             displayObservations.Clear();
             scenarioCancellation = new CancellationTokenSource();
-            ResultState.Text = "Waiting for operator-confirmed display move";
-            ResultDetail.Text = "The same isolated pet HWND is ready. Capture the first display after your manual move.";
-            Instructions.Text = $"A single live pet HWND was discovered through UI Automation for the isolated app PID. Manually drag that same pet near a work-area edge on {displayMonitors[0].Alias}, let placement settle, then click the button to confirm and capture its DPI/physical geometry. The second confirmation is for {displayMonitors[1].Alias}. The app remains isolated and no input or placement is injected by the utility.";
-            CaptureDisplayButton.Content = $"I moved the same pet to {displayMonitors[0].Alias} — capture";
+            if (scenario == "display-removal")
+            {
+                ResultState.Text = "Waiting for operator to place pet on Display 2";
+                ResultDetail.Text = "The same isolated pet HWND is ready. No display change or database action beyond this isolated run is initiated.";
+                var target = displayMonitors.Single(item => item.Alias == "Display 2");
+                Instructions.Text = $"A live pet HWND was discovered through UI Automation for the isolated app PID. Manually drag that real test pet onto {target.Alias} and let normal WPF placement settle. Click capture before disconnecting or disabling that display. After capture, the utility waits up to five minutes for the actual Windows display-change event and refreshed enumeration. Cancel at any time.";
+                CaptureDisplayButton.Content = $"I moved the pet to {target.Alias} — capture pre-removal bounds";
+            }
+            else
+            {
+                ResultState.Text = "Waiting for operator-confirmed display move";
+                ResultDetail.Text = "The same isolated pet HWND is ready. Capture the first display after your manual move.";
+                Instructions.Text = $"A single live pet HWND was discovered through UI Automation for the isolated app PID. Manually drag that same pet near a work-area edge on {displayMonitors[0].Alias}, let placement settle, then click the button to confirm and capture its DPI/physical geometry. The second confirmation is for {displayMonitors[1].Alias}. The app remains isolated and no input or placement is injected by the utility.";
+                CaptureDisplayButton.Content = $"I moved the same pet to {displayMonitors[0].Alias} — capture";
+            }
             CaptureDisplayButton.IsEnabled = true;
         }
         catch (AcceptanceSkippedException ex)
         {
+            if (displayRun is not null)
+            {
+                if (!await EndDisplayRunSafelyAsync()) return;
+            }
+            else
+            {
+                DisposeDisplayScenario();
+            }
             ShowResult(AcceptanceStatus.Skipped, ex.Message);
-            DisposeDisplayScenario();
         }
         catch (OperationCanceledException)
         {
@@ -297,6 +367,12 @@ public partial class WindowsAcceptanceWindow : Window
 
     private async Task CaptureDisplayObservationAsync()
     {
+        if (scenario == "display-removal")
+        {
+            await CaptureRemovalRequestAndRunAsync();
+            return;
+        }
+
         var currentRun = displayRun;
         var currentScenario = displayScenario;
         var availableMonitors = displayMonitors;
@@ -347,6 +423,59 @@ public partial class WindowsAcceptanceWindow : Window
             ShowResult(AcceptanceStatus.Failed,
                 "Read-only UIA/Native display observation failed; no monitor identifiers, HWND values, or unrelated titles were reported.");
             await EndDisplayRunSafelyAsync();
+        }
+    }
+
+    private async Task CaptureRemovalRequestAndRunAsync()
+    {
+        var currentRun = displayRun;
+        var currentScenario = displayScenario;
+        var availableMonitors = displayMonitors;
+        var cancellationToken = scenarioCancellation?.Token ?? CancellationToken.None;
+        if (currentRun is null || currentScenario is null || availableMonitors is null || availableMonitors.Count < 2)
+            return;
+
+        try
+        {
+            var target = availableMonitors.Single(item => item.Alias == "Display 2");
+            ResultState.Text = $"Capturing pre-removal request on {target.Alias}";
+            ResultDetail.Text = "Reading the same isolated pet HWND, its actual physical rectangle, and the connected primary work area.";
+            var request = await currentScenario.CaptureRemovalRequestAsync(
+                target.Alias, displayPetHwnd, currentRun.ProductProcessId,
+                () => displayRun?.IsProductRunning == true, cancellationToken);
+            CaptureDisplayButton.IsEnabled = false;
+            ResultState.Text = "Waiting for manual monitor removal";
+            ResultDetail.Text = "Captured pre-removal physical bounds. Disconnect or disable only the named secondary display manually; the utility will not alter or restore topology.";
+            Instructions.Text = $"Captured request for {request.TargetAlias}. Now manually disconnect or disable only {request.TargetAlias} through Windows display controls. Do not remove the primary display. The app remains isolated and this controller stays responsive while waiting for the real DisplaySettingsChanged event plus fresh enumeration showing {request.TargetAlias} absent. Timeout is five minutes; Cancel reports Incomplete. Restore the display manually after the result.";
+
+            var result = await currentScenario.RunRemovalRecoveryAsync(
+                request,
+                () => displayRun?.IsProductRunning == true,
+                cancellationToken);
+            if (!await EndDisplayRunSafelyAsync()) return;
+            ShowResult(result.Status, result.Summary);
+            Instructions.Text += "\n\nTopology is never restored automatically. Restore the display manually using Windows controls.";
+        }
+        catch (DisplayRemovalPreconditionException ex)
+        {
+            if (await EndDisplayRunSafelyAsync())
+                ShowResult(AcceptanceStatus.Skipped, ex.Message);
+        }
+        catch (TimeoutException)
+        {
+            if (await EndDisplayRunSafelyAsync())
+                ShowResult(AcceptanceStatus.Incomplete, "Timed out while waiting for stable pre-removal placement; no topology-recovery verdict was produced.");
+        }
+        catch (OperationCanceledException)
+        {
+            if (await EndDisplayRunSafelyAsync())
+                ShowResult(AcceptanceStatus.Incomplete, "Operator cancelled; no topology-recovery acceptance verdict was produced.");
+        }
+        catch (Exception)
+        {
+            if (!await EndDisplayRunSafelyAsync()) return;
+            ShowResult(AcceptanceStatus.Failed,
+                "The captured request or read-only native topology recovery observation failed; no hardware identifiers were reported.");
         }
     }
 
@@ -480,7 +609,7 @@ public partial class WindowsAcceptanceWindow : Window
         CaptureDisplayButton.IsEnabled = false;
         ResultState.Text = AcceptanceStatus.Incomplete.ToString();
         ResultDetail.Text = "Operator cancelled; no acceptance verdict was produced.";
-        if (pendingScenario is null)
+        if (pendingScenario is null && pendingDisplayStartup is null)
         {
             await EndRunSafelyAsync();
             await EndDisplayRunSafelyAsync();
@@ -492,13 +621,15 @@ public partial class WindowsAcceptanceWindow : Window
         if (closing) return;
         ResultState.Text = status.ToString();
         ResultDetail.Text = detail;
-        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped && scenario is "lock" or "power" or "display";
+        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped &&
+            (scenario is "lock" or "power" or "display" or "display-removal");
         CompleteButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
         CaptureDisplayButton.IsEnabled = false;
         LockScenario.IsEnabled = status != AcceptanceStatus.Skipped;
         PowerScenario.IsEnabled = status != AcceptanceStatus.Skipped;
         DisplayScenarioButton.IsEnabled = true;
+        DisplayRemovalScenarioButton.IsEnabled = true;
     }
 
     private async Task EndRunAsync()
@@ -527,13 +658,18 @@ public partial class WindowsAcceptanceWindow : Window
         scenarioCancellation = null;
     }
 
-    private async Task EndDisplayRunSafelyAsync()
+    private async Task<bool> EndDisplayRunSafelyAsync()
     {
-        try { await EndDisplayRunAsync(); }
+        try
+        {
+            await EndDisplayRunAsync();
+            return true;
+        }
         catch (Exception)
         {
             ShowResult(AcceptanceStatus.Failed,
                 "The owned display app could not be fully stopped; its private run directory was retained for safety.");
+            return false;
         }
     }
 
