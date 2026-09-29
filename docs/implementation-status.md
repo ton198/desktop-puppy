@@ -2,13 +2,14 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-26
-**Latest verified step:** Merged the end-to-end daily usage statistics and 15-local-date retention feature to `main` (`2aa0fd7`); post-merge verification passed 101 unit tests, 11 Windows UI tests, and a Release build with 0 warnings / 0 errors.
-**Current phase:** Phase 4 in progress — foreground collection, session/power wiring, local-day aggregation, 15-date retention, and the statistics window are implemented; live OS acceptance checks and native monitor/DPI integration remain.
-**Current branch:** `main`
-**Worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy`
-**Latest integration commit:** `2aa0fd7` (`Merge branch 'codex/usage-statistics-window-retention'`)
-**Base commit:** `3c2c116`
+**Last updated:** 2026-09-29
+**Latest verified step:** Task 7 on `codex/windows-e2e-acceptance`: fresh serialized Release solution build succeeded with 0 warnings / 0 errors, and the full deterministic unit suite passed 174/174. All UI tests and both real display hardware scenarios are **Not run**; see the Task 7 evidence below.
+**Current phase:** Phase 4 in progress — usage statistics and native monitor/DPI placement are implemented on the acceptance branch; real mixed-DPI and monitor-removal acceptance remain unverified.
+**Current verification branch:** `codex/windows-e2e-acceptance`
+**Current verification worktree:** `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`
+**Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
+**Latest integration commit on main (historical):** `2aa0fd7` (`Merge branch 'codex/usage-statistics-window-retention'`)
+**Original implementation base (historical):** `3c2c116`
 
 ## Completed
 
@@ -653,3 +654,51 @@ The 30-second statistics refresh has been exercised by the real long-running tim
 ### Safety review
 
 Reviewed the acceptance controller, event observer, owned-directory helper, and product database path selection. The harness has no API calls that initiate lock/unlock/sleep/wake, no credential APIs, and no synthetic/system-event injection path used to obtain an acceptance pass. Unit-level fake event tests remain simulations and are not reported as hardware acceptance. Temporary cleanup is guarded to the unique per-run child under the harness-owned temp root and refuses reparse-point replacement; if owned children cannot be stopped, cleanup retains the directory. The acceptance controller initializes and queries only its run-owned SQLite database passed explicitly to the isolated product process; it does not open the production database. No actual OS transition or input injection was performed for this documentation task.
+
+## Native monitor/DPI placement and live acceptance — Task 7 (2026-09-29)
+
+### Current branch and production connection
+
+Task 7 verified branch `codex/windows-e2e-acceptance` at starting commit `7a22be97aa92fc69d1bb2128bc50e85c53c31640` in `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`. The only tracked Task 7 change updates this status document; it does not merge the branch into `main`.
+
+The native placement path is connected to the production pet window:
+
+- `App` composes `Win32MonitorDisplayProvider`, `Win32WindowPositioner`, and `PetWindowPlacementService`. The service applies initial placement after the pet HWND is loaded and reconciles after location, per-monitor DPI, and display-settings changes.
+- `PetWindow` marshals display-change reconciliation onto its WPF dispatcher. Initialization or later placement failures are caught and logged; placement initialization failure preserves ordinary WPF startup placement and does not prevent the offline pet from starting.
+- Monitor enumeration, work-area/bounds queries, containing-monitor/DPI queries, and the window-positioner P/Invokes are under `src/DesktopPuppy/Native`. The pre-existing, unrelated `GetDoubleClickTime` P/Invoke remains in `PetWindow`; it is not part of monitor/DPI placement.
+- The only native window mutation used by placement is `SetWindowPos` for the pet HWND, with `SWP_NOACTIVATE | SWP_NOZORDER`. A source search found no API that changes display mode or monitor topology (`ChangeDisplaySettings*`, `SetDisplayConfig`, or equivalent).
+- `PetWindow.OnClosed` detaches its `DisplaySettingsChanged` handler and forgets its HWND placement state. `App.OnExit` disposes the placement service and then the monitor provider. The provider unsubscribes from `SystemEvents.DisplaySettingsChanged`, prevents new forwarding after disposal, and drains active callbacks; dispatch/shutdown races are guarded and caught.
+- The mixed-DPI and monitor-removal acceptance controller uses read-only observations and does not initiate a display/topology change. Its cleanup is scoped to the isolated child and owned run directory; directory deletion depends on affirmative child-exit confirmation.
+
+This is a source/lifecycle safety review, not evidence of live WPF behavior on a multi-monitor desktop.
+
+### Fresh Task 7 verification
+
+Verification date: **2026-09-29 (America/New_York, UTC-04:00)**. The serialized build reported 00:00:21.23 and the xUnit run reported 3 seconds. The execution transcript did not record separate command wall-clock start/end times; the final test-assembly artifact was written at 04:39:52.725 -04:00 during the build. The xUnit command followed immediately in the same invocation, so no unsupported exact xUnit clock time is asserted.
+
+Commands ran serially from the Task 7 worktree using .NET SDK `10.0.401`:
+
+```powershell
+& "C:\Program Files\dotnet\dotnet.exe" build DesktopPuppy.sln --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false
+& "C:\Program Files\dotnet\dotnet.exe" test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal
+```
+
+Observed fresh results:
+
+- **Serialized Release solution build:** exit code 0; build succeeded with **0 warnings and 0 errors**. Solution membership/build output included `DesktopPuppy`, `DesktopPuppy.WindowsAcceptance.Core`, `DesktopPuppy.WindowsAcceptance`, and `DesktopPuppy.Tests`. The acceptance controller was build-verified only; it was not launched.
+- **Full deterministic `DesktopPuppy.Tests` suite:** exit code 0; **174 passed, 0 failed, 0 skipped**.
+- **UI tests:** **Not run**. This includes `Category=Ui`, all UI smoke tests, and the long-running UI E2E. The UI harness can inject `SendInput` and launch a topmost pet window, so no UI test was run on the active desktop. The historical UI results elsewhere in this document are not Task 7 or post-acceptance-branch evidence.
+- No test or build command launched the acceptance utility or performed a live display/topology action. No live monitor/DPI measurement was collected.
+
+### Hardware acceptance and prerequisites
+
+- **E2E-DISPLAY-01 — real mixed-DPI placement:** **Not run**.
+- **E2E-DISPLAY-02 — real monitor removal and primary fallback:** **Not run**.
+- The manual display utility was not launched or opted into. No preflight was run, so neither scenario is reported as `Skipped`; no hardware result is inferred from the build or fake-backed tests.
+- The acceptance procedure requires Windows in a local interactive session (not Remote Desktop), at least two connected displays, both explicit acceptance opt-ins, an absolute path to the Release `DesktopPuppy.exe`, and no unrelated running `DesktopPuppy` process. Mixed-DPI acceptance additionally requires the same pet HWND to be observed on two displays with distinct measured DPI values. Monitor-removal acceptance requires Display 2 to be a secondary display, the primary to remain connected, and an operator to disconnect/disable and later restore the target display manually.
+- These are documented prerequisites, **not observed environment facts for this run**: because the utility was not launched and live display enumeration was not performed, the actual display count, DPI values, topology, operator preflight, and removal outcome are unknown. Hardware acceptance remains **Not run**, not Passed or Skipped.
+- Builds and deterministic unit tests—including fake-provider/native-boundary tests—do not establish real mixed-DPI movement, event delivery from Windows, or topology-removal recovery. Those checks remain for an operator on qualifying hardware.
+
+### Scope and changed files
+
+Task 7 changed `docs/implementation-status.md` as the only tracked file. The ignored ledger `progress.md` records the two safety rulings; no plan Markdown was changed. The requested execution report is at `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy\.superpowers\sdd\2026-09-28-monitor-dpi-placement-acceptance-plan\task-7-report.md`. No README, production code, or test code was changed.
