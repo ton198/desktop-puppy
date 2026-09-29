@@ -631,7 +631,14 @@ dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration R
 ```
 
 - **Full unit suite:** 121 passed, 0 failed, 0 skipped. This includes Task 4's distinct pre-suspend/resumed-fixture regression.
-- **Fresh Release solution/controller build:** attempted twice; **not verified**. Both attempts failed when WPF markup compilation could not access its generated `.obj` cache (`Access to the path ... DesktopPuppy.WindowsAcceptance_MarkupCompile.cache is denied`; the first attempt reported the analogous product markup cache, and the intermediate full-unit run succeeded). The build reported 0 warnings and 1 error. Do not treat this as a passing build.
+- **Fresh Release solution/controller build:** the ordinary parallel/node-reuse attempts hit WPF markup-cache access denied; the cause was not established. A fresh serialized, no-incremental full-solution build then succeeded with 0 warnings and 0 errors using the command below. The full unit suite was run immediately afterward without rebuilding: 121 passed, 0 failed, 0 skipped.
+
+```powershell
+dotnet build DesktopPuppy.sln --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore
+```
+
+The successful serialized build is the current verification result; the earlier access-denied attempts are retained as a note, not treated as proof of a specific root cause.
 - **Latest safe UI smoke (2026-09-28, Task 4):** `DesktopPuppyWindowUiTests` 1/1 passed in a separate historical run. This smoke is not the full UI category.
 - **Historical full `Category=Ui` result (2026-09-26):** 11/11 passed before the Task 4/5 changes. A post-acceptance full-category rerun is **Not run** because interaction tests use `SendInput` on the active desktop. The Task 4 report's failed prerequisite attempt is not a UI suite result.
 - **Real 30-second refresh E2E (2026-09-28):** 1/1 passed in 33 seconds in a separate long-running category. This is not hardware power-event verification.
