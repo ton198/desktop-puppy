@@ -88,6 +88,90 @@ public sealed class Win32MonitorDisplayProviderTests
         Assert.Equal(0, events.SubscriberCount);
     }
 
+
+    // Purpose: Keep subscriber failures from escaping the SystemEvents callback boundary.
+    // Coverage: A provider subscriber throws while the fake display-settings source raises an event.
+    // Target effect: The fake source callback returns normally despite the throwing subscriber.
+    [Fact]
+    public void Provider_contains_exceptions_from_display_change_subscribers()
+    {
+        var api = new FakeDisplayApi(new Dictionary<IntPtr, NativeMonitorInfo>());
+        var events = new FakeDisplaySettingsChangedSource();
+        using var provider = new Win32MonitorDisplayProvider(api, events);
+        provider.DisplaySettingsChanged += (_, _) => throw new InvalidOperationException("subscriber failure");
+
+        var escapedException = Record.Exception(events.Raise);
+
+        Assert.Null(escapedException);
+    }
+
+    // Purpose: Ensure Dispose drains active forwarding before returning and permanently stops delivery.
+    // Coverage: Hold a subscriber on an event gate while disposing, then raise another event after disposal.
+    // Target effect: Dispose waits for the active callback; no later event reaches the subscriber.
+    [Fact]
+    public async Task Provider_dispose_waits_for_in_flight_display_change_and_stops_later_events()
+    {
+        var api = new FakeDisplayApi(new Dictionary<IntPtr, NativeMonitorInfo>());
+        var events = new FakeDisplaySettingsChangedSource();
+        using var provider = new Win32MonitorDisplayProvider(api, events);
+        using var releaseCallback = new ManualResetEventSlim();
+        var callbackEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callbackCount = 0;
+        provider.DisplaySettingsChanged += (_, _) =>
+        {
+            Interlocked.Increment(ref callbackCount);
+            callbackEntered.TrySetResult();
+            releaseCallback.Wait();
+        };
+
+        var callbackTask = Task.Run(events.Raise);
+        await callbackEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var disposeTask = Task.Run(provider.Dispose);
+        try
+        {
+            await events.Unsubscribed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.ThrowsAsync<TimeoutException>(async () =>
+                await disposeTask.WaitAsync(TimeSpan.FromMilliseconds(200)));
+        }
+        finally
+        {
+            releaseCallback.Set();
+        }
+
+        await callbackTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+        events.Raise();
+
+        Assert.Equal(1, Volatile.Read(ref callbackCount));
+        Assert.Equal(0, events.SubscriberCount);
+    }
+
+
+    // Purpose: Keep reentrant Dispose from deadlocking or starting another subscriber after disposal.
+    // Coverage: The first display-change subscriber disposes its provider during notification.
+    // Target effect: Dispose returns, the remaining subscriber and all later events are skipped.
+    [Fact]
+    public async Task Provider_reentrant_dispose_stops_remaining_display_change_subscribers()
+    {
+        var api = new FakeDisplayApi(new Dictionary<IntPtr, NativeMonitorInfo>());
+        var events = new FakeDisplaySettingsChangedSource();
+        using var provider = new Win32MonitorDisplayProvider(api, events);
+        var firstSubscriberCalls = 0;
+        var laterSubscriberCalls = 0;
+        provider.DisplaySettingsChanged += (_, _) =>
+        {
+            Interlocked.Increment(ref firstSubscriberCalls);
+            provider.Dispose();
+        };
+        provider.DisplaySettingsChanged += (_, _) => Interlocked.Increment(ref laterSubscriberCalls);
+
+        await Task.Run(events.Raise).WaitAsync(TimeSpan.FromSeconds(5));
+        events.Raise();
+
+        Assert.Equal(1, Volatile.Read(ref firstSubscriberCalls));
+        Assert.Equal(0, Volatile.Read(ref laterSubscriberCalls));
+        Assert.Equal(0, events.SubscriberCount);
+    }
     private sealed class FakeDisplayApi(
         IReadOnlyDictionary<IntPtr, NativeMonitorInfo> monitors,
         params IntPtr[] enumerationOrder) : IWin32DisplayApi
@@ -124,9 +208,57 @@ public sealed class Win32MonitorDisplayProviderTests
 
     private sealed class FakeDisplaySettingsChangedSource : IDisplaySettingsChangedSource, IDisposable
     {
-        public event EventHandler? DisplaySettingsChanged;
-        public int SubscriberCount => DisplaySettingsChanged?.GetInvocationList().Length ?? 0;
-        public void Raise() => DisplaySettingsChanged?.Invoke(this, EventArgs.Empty);
-        public void Dispose() => DisplaySettingsChanged = null;
+        private readonly object _gate = new();
+        private EventHandler? _displaySettingsChanged;
+
+        public TaskCompletionSource Unsubscribed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public event EventHandler? DisplaySettingsChanged
+        {
+            add
+            {
+                lock (_gate)
+                {
+                    _displaySettingsChanged += value;
+                }
+            }
+            remove
+            {
+                lock (_gate)
+                {
+                    _displaySettingsChanged -= value;
+                }
+                Unsubscribed.TrySetResult();
+            }
+        }
+
+        public int SubscriberCount
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _displaySettingsChanged?.GetInvocationList().Length ?? 0;
+                }
+            }
+        }
+
+        public void Raise()
+        {
+            EventHandler? handler;
+            lock (_gate)
+            {
+                handler = _displaySettingsChanged;
+            }
+            handler?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                _displaySettingsChanged = null;
+            }
+        }
     }
 }

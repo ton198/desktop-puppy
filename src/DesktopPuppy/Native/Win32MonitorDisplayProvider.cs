@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using Microsoft.Win32;
 
 namespace DesktopPuppy.Native;
@@ -11,6 +12,9 @@ public sealed class Win32MonitorDisplayProvider : IMonitorDisplayProvider, IDisp
     private IReadOnlyList<MonitorDisplayInfo> _monitors = Array.Empty<MonitorDisplayInfo>();
     private Dictionary<IntPtr, MonitorDisplayInfo> _monitorsByHandle = new();
     private bool _disposed;
+    private bool _unsubscribed;
+    private int _activeCallbacks;
+    private readonly Dictionary<int, int> _callbackDepthByThread = new();
 
     public Win32MonitorDisplayProvider()
         : this(new Win32DisplayApi(), new SystemDisplaySettingsChangedSource())
@@ -124,30 +128,123 @@ public sealed class Win32MonitorDisplayProvider : IMonitorDisplayProvider, IDisp
 
     public void Dispose()
     {
+        var threadId = Environment.CurrentManagedThreadId;
+        var unsubscribe = false;
+        bool calledFromCallback;
         lock (_gate)
         {
-            if (_disposed)
+            if (!_disposed)
             {
-                return;
+                _disposed = true;
+                unsubscribe = true;
             }
 
-            _disposed = true;
+            calledFromCallback = _callbackDepthByThread.ContainsKey(threadId);
         }
 
-        _displaySettings.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        if (unsubscribe)
+        {
+            try
+            {
+                _displaySettings.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            }
+            finally
+            {
+                lock (_gate)
+                {
+                    _unsubscribed = true;
+                    Monitor.PulseAll(_gate);
+                }
+            }
+        }
+
+        if (calledFromCallback)
+        {
+            // The current notification cannot drain its own stack; _disposed prevents any new forwarding.
+            return;
+        }
+
+        lock (_gate)
+        {
+            while (!_unsubscribed || _activeCallbacks > 0)
+            {
+                Monitor.Wait(_gate);
+            }
+        }
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs args)
     {
+        var threadId = Environment.CurrentManagedThreadId;
         lock (_gate)
         {
             if (_disposed)
             {
                 return;
             }
+
+            _activeCallbacks++;
+            _callbackDepthByThread.TryGetValue(threadId, out var callbackDepth);
+            _callbackDepthByThread[threadId] = callbackDepth + 1;
         }
 
-        DisplaySettingsChanged?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            var subscribers = DisplaySettingsChanged;
+            if (subscribers is null)
+            {
+                return;
+            }
+
+            foreach (EventHandler subscriber in subscribers.GetInvocationList())
+            {
+                lock (_gate)
+                {
+                    if (_disposed)
+                    {
+                        break;
+                    }
+                }
+
+                try
+                {
+                    subscriber(this, EventArgs.Empty);
+                }
+                catch (Exception exception)
+                {
+                    ReportSubscriberFailure(exception);
+                }
+            }
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _activeCallbacks--;
+                var callbackDepth = _callbackDepthByThread[threadId] - 1;
+                if (callbackDepth == 0)
+                {
+                    _callbackDepthByThread.Remove(threadId);
+                }
+                else
+                {
+                    _callbackDepthByThread[threadId] = callbackDepth;
+                }
+                Monitor.PulseAll(_gate);
+            }
+        }
+    }
+
+    private static void ReportSubscriberFailure(Exception exception)
+    {
+        try
+        {
+            Trace.TraceError("A DisplaySettingsChanged subscriber failed: {0}", exception);
+        }
+        catch
+        {
+            // A failing diagnostic listener must not reintroduce an exception at the SystemEvents boundary.
+        }
     }
 
     private sealed class SystemDisplaySettingsChangedSource : IDisplaySettingsChangedSource
