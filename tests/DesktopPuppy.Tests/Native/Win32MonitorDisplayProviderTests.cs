@@ -5,6 +5,29 @@ namespace DesktopPuppy.Tests.Native;
 
 public sealed class Win32MonitorDisplayProviderTests
 {
+    // Purpose: Prevent native monitor identifiers from leaking through geometry-validation diagnostics.
+    // Coverage: A monitor with a unique device ID and invalid native bounds reaches provider mapping failure.
+    // Target effect: The thrown exception and its inner-message chain contain no device identifier.
+    [Fact]
+    public void Provider_invalid_native_geometry_diagnostic_does_not_expose_device_id()
+    {
+        const string uniqueDeviceId = "MONITOR-PRIVACY-REGRESSION-7f3c91a2";
+        var handle = new IntPtr(44);
+        var api = new FakeDisplayApi(new Dictionary<IntPtr, NativeMonitorInfo>
+        {
+            [handle] = new(uniqueDeviceId,
+                new PhysicalRect(0, 0, 0, 1080),
+                new PhysicalRect(0, 0, 1920, 1040),
+                true)
+        }, handle);
+        using var events = new FakeDisplaySettingsChangedSource();
+        using var provider = new Win32MonitorDisplayProvider(api, events);
+
+        var error = Assert.Throws<InvalidOperationException>(() => provider.GetMonitors());
+
+        Assert.DoesNotContain(uniqueDeviceId, error.ToString(), StringComparison.Ordinal);
+    }
+
     // Purpose: Ensure Windows' enumeration order does not dictate primary selection or discard left-side monitors.
     // Coverage: Fake monitor handles with one primary and one negative-origin secondary.
     // Target effect: Both work areas and the primary flag map correctly.

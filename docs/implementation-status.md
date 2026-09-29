@@ -3,7 +3,7 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-29
-**Latest verified step:** Task 7 on `codex/windows-e2e-acceptance`: fresh serialized Release solution build succeeded with 0 warnings / 0 errors, and the full deterministic unit suite passed 174/174. All UI tests and both real display hardware scenarios are **Not run**; see the Task 7 evidence below.
+**Latest verified step:** Final-review follow-up on fix base `204b1816db5b83bda87ca207498b24e31f4eda3e`: fresh serialized Release solution build succeeded with 0 warnings / 0 errors, and the full deterministic xUnit suite passed 175/175. `Category=Ui` and both real display hardware scenarios remain **Not run**; see the follow-up below.
 **Current phase:** Phase 4 in progress — usage statistics and native monitor/DPI placement are implemented on the acceptance branch; real mixed-DPI and monitor-removal acceptance remain unverified.
 **Current verification branch:** `codex/windows-e2e-acceptance`
 **Current verification worktree:** `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`
@@ -702,3 +702,11 @@ Observed fresh results:
 ### Scope and changed files
 
 Task 7 changed `docs/implementation-status.md` as the only tracked file. The ignored ledger `progress.md` records the two safety rulings; no plan Markdown was changed. The requested execution report is at `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy\.superpowers\sdd\2026-09-28-monitor-dpi-placement-acceptance-plan\task-7-report.md`. No README, production code, or test code was changed.
+
+## Final-review follow-up — 2026-09-29
+
+The separate acceptance executable now has its own `app.manifest` wired through `ApplicationManifest`, declaring PerMonitorV2 awareness. The focused invalid-native-geometry privacy regression demonstrated the device-ID leak before the provider diagnostic was made identifier-free; it passes after the fix. Both `AcceptanceRunTests` facts now carry Purpose, Coverage, and Target effect annotations.
+
+Fresh verification on the current fix: MSBuild evaluates `ApplicationManifest` to `app.manifest`, and the manifest parses as valid XML with `dpiAwareness=PerMonitorV2,PerMonitor` and `dpiAware=true/pm`. A serialized Release solution build succeeded with **0 warnings / 0 errors**; the full deterministic test suite passed **175/175**. The Task 7 section above remains the historical 174-test result from its own run.
+
+`Category=Ui` was **Not run**. The acceptance utility was not launched. E2E-DISPLAY-01 mixed-DPI placement and E2E-DISPLAY-02 monitor removal/primary fallback both remain **Not run**; no display/topology change was made.

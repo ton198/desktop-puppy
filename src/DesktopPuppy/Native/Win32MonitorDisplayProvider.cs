@@ -68,7 +68,7 @@ public sealed class Win32MonitorDisplayProvider : IMonitorDisplayProvider, IDisp
             }
             catch (ArgumentException exception)
             {
-                mappingFailure = new InvalidOperationException($"Native monitor '{info.DeviceId}' returned invalid geometry or a duplicate handle.", exception);
+                mappingFailure = new InvalidOperationException("Native monitor returned invalid geometry or a duplicate handle.", exception);
                 return false;
             }
         });

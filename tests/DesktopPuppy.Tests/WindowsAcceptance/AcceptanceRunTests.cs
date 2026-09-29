@@ -7,6 +7,9 @@ namespace DesktopPuppy.Tests.WindowsAcceptance;
 
 public sealed class AcceptanceRunTests
 {
+    // Purpose: Ensure the observer records only the system-event kinds accepted by the power-session contract.
+    // Coverage: Record a supported lock event, an unsupported shutdown event, and a supported resume event with timestamps.
+    // Target effect: Unsupported event kinds are excluded while supported kinds retain their original timestamps.
     [Fact]
     public void Observer_records_only_supported_event_kinds_and_timestamps()
     {
@@ -22,6 +25,9 @@ public sealed class AcceptanceRunTests
         }, observer.Snapshot());
     }
 
+    // Purpose: Prevent event observations alone from passing an acceptance scenario without implemented checks.
+    // Coverage: Record lock/unlock events and evaluate the explicitly unimplemented scenario result.
+    // Target effect: The result remains Incomplete and retains the observed event count.
     [Fact]
     public void Unimplemented_scenarios_cannot_report_passed_from_events_alone()
     {
