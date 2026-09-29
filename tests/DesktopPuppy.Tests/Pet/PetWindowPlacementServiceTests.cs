@@ -82,10 +82,10 @@ public sealed class PetWindowPlacementServiceTests
         service.ApplyInitial(hwnd, widthDip: 260, heightDip: 210);
 
         monitors.SetMonitors(Primary);
-        windows.SetWindow(hwnd, new PhysicalRect(500, 300, 760, 510), Primary, 96);
+        windows.SetWindow(hwnd, new PhysicalRect(500, 300, 760, 510), Primary, 144);
         service.Reconcile(hwnd, widthDip: 260, heightDip: 210);
 
-        Assert.Equal(new PhysicalRect(-240, 100, 20, 310), windows.GetBounds(hwnd));
+        Assert.Equal(new PhysicalRect(-370, 100, 20, 415), windows.GetBounds(hwnd));
     }
 
     // Purpose: Prevent move-notification feedback loops.

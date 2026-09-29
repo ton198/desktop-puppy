@@ -1,3 +1,5 @@
+using DesktopPuppy.Native;
+
 namespace DesktopPuppy.Pet.Placement;
 
 /// <summary>Describes a monitor work area in physical pixels.</summary>
@@ -46,25 +48,51 @@ public static class PetPlacementPolicy
         MonitorWorkArea workArea,
         double minimumVisiblePixels = DefaultMinimumVisiblePixels)
     {
-        if (petWidth <= 0)
+        if (!double.IsFinite(petWidth) || petWidth <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(petWidth));
         }
 
-        if (petHeight <= 0)
+        if (!double.IsFinite(petHeight) || petHeight <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(petHeight));
         }
 
-        if (minimumVisiblePixels < 0)
+        if (!double.IsFinite(requested.Left) || !double.IsFinite(requested.Top))
+        {
+            throw new ArgumentOutOfRangeException(nameof(requested), "Requested physical coordinates must be finite.");
+        }
+
+        if (!double.IsFinite(workArea.Left) || !double.IsFinite(workArea.Top) ||
+            !double.IsFinite(workArea.Width) || workArea.Width <= 0 ||
+            !double.IsFinite(workArea.Height) || workArea.Height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workArea), "Work-area coordinates and extents must be finite, with positive dimensions.");
+        }
+
+        var workAreaRight = workArea.Left + workArea.Width;
+        var workAreaBottom = workArea.Top + workArea.Height;
+        if (!double.IsFinite(workAreaRight) || workAreaRight <= workArea.Left ||
+            !double.IsFinite(workAreaBottom) || workAreaBottom <= workArea.Top)
+        {
+            throw new ArgumentOutOfRangeException(nameof(workArea), "Work-area edges must form finite positive extents.");
+        }
+
+        if (!double.IsFinite(minimumVisiblePixels) || minimumVisiblePixels < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(minimumVisiblePixels));
         }
 
         var minLeft = workArea.Left - petWidth + minimumVisiblePixels;
-        var maxLeft = workArea.Left + workArea.Width - minimumVisiblePixels;
+        var maxLeft = workAreaRight - minimumVisiblePixels;
         var minTop = workArea.Top - petHeight + minimumVisiblePixels;
-        var maxTop = workArea.Top + workArea.Height - minimumVisiblePixels;
+        var maxTop = workAreaBottom - minimumVisiblePixels;
+
+        if (!double.IsFinite(minLeft) || !double.IsFinite(maxLeft) ||
+            !double.IsFinite(minTop) || !double.IsFinite(maxTop))
+        {
+            throw new ArgumentOutOfRangeException(nameof(workArea), "Work-area and window geometry must produce finite placement limits.");
+        }
 
         return new PetPosition(
             Math.Clamp(requested.Left, minLeft, maxLeft),

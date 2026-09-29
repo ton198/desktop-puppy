@@ -5,6 +5,9 @@ namespace DesktopPuppy.Tests.Pet;
 
 public sealed class DpiGeometryPolicyTests
 {
+    // Purpose: Preserve identity conversion at the standard 96-DPI scale.
+    // Coverage: Positive and negative fractional geometry at 100% scale.
+    // Target effect: Device pixels and DIPs retain their original values.
     [Fact]
     public void One_hundred_percent_scale_is_identity()
     {
@@ -12,18 +15,27 @@ public sealed class DpiGeometryPolicyTests
         Assert.Equal(-40.25, DpiGeometryPolicy.ToDips(-40.25, 1.0));
     }
 
+    // Purpose: Support non-integer monitor scale factors.
+    // Coverage: DIP conversion at 125% scale.
+    // Target effect: Device-pixel geometry uses the explicit scale.
     [Fact]
     public void Dip_to_device_conversion_applies_explicit_non_integer_scale()
     {
         Assert.Equal(100, DpiGeometryPolicy.ToDevicePixels(80, 1.25));
     }
 
+    // Purpose: Convert measured device pixels back into window-independent units.
+    // Coverage: Device-to-DIP conversion at 150% scale.
+    // Target effect: Returned DIPs reflect the explicit window scale.
     [Fact]
     public void Device_to_dip_conversion_applies_explicit_scale()
     {
         Assert.Equal(200, DpiGeometryPolicy.ToDips(300, 1.5));
     }
 
+    // Purpose: Avoid clipping fractional WPF extents when constructing integer HWND bounds.
+    // Coverage: Exact and fractional DIP extents at 100% and 150% DPI.
+    // Target effect: Physical extents are rounded upward to the next integer pixel.
     [Theory]
     [InlineData(100.0, 96, 100)]
     [InlineData(100.01, 96, 101)]
@@ -34,6 +46,9 @@ public sealed class DpiGeometryPolicyTests
         Assert.Equal(expected, DpiGeometryPolicy.ToPhysicalExtent(dips, dpi));
     }
 
+    // Purpose: Keep midpoint rounding deterministic on either side of the virtual-screen origin.
+    // Coverage: Positive and negative midpoint and non-midpoint physical coordinates.
+    // Target effect: Midpoints round away from zero without collapsing negative positions toward the origin.
     [Theory]
     [InlineData(10.5, 11)]
     [InlineData(-10.5, -11)]
@@ -44,6 +59,9 @@ public sealed class DpiGeometryPolicyTests
         Assert.Equal(expected, DpiGeometryPolicy.RoundPhysicalCoordinate(coordinate));
     }
 
+    // Purpose: Preserve fractional geometry through reversible scale conversion.
+    // Coverage: Common fractional DPI scales.
+    // Target effect: The round trip stays within floating-point tolerance.
     [Theory]
     [InlineData(1.25)]
     [InlineData(1.5)]
@@ -57,6 +75,9 @@ public sealed class DpiGeometryPolicyTests
         Assert.InRange(Math.Abs(recovered - dips), 0, 1e-9);
     }
 
+    // Purpose: Keep the visible-edge contract independent of the WPF scale at 150% DPI.
+    // Coverage: All four work-area edges with a physical 20-pixel margin.
+    // Target effect: Clamped window rectangles retain exactly 20 physical pixels at each tested edge.
     [Fact]
     public void Visible_edge_margin_is_twenty_physical_pixels_at_one_hundred_fifty_percent_scale()
     {
@@ -81,6 +102,9 @@ public sealed class DpiGeometryPolicyTests
         Assert.Equal(20, workArea.Top + workArea.Height - clamped[3].Top);
     }
 
+    // Purpose: Avoid scaling the physical visible margin when monitor DPI changes.
+    // Coverage: The same 20-pixel margin for 96-DPI and 144-DPI physical extents.
+    // Target effect: The visible amount remains 20 physical pixels at both scales.
     [Fact]
     public void Same_physical_visible_margin_is_independent_of_monitor_scale()
     {

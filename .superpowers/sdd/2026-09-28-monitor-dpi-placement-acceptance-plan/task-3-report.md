@@ -92,3 +92,83 @@ Exact result: `已成功生成。 0 个警告 0 个错误` (exit code 0).
 ## Concerns
 
 No unresolved spec/API ambiguity or implementation blocker. Hardware acceptance and Task 4 dispatcher/App/PetWindow wiring remain intentionally out of scope.
+
+## Fix round 1/5 — review corrections
+
+### Review findings addressed
+
+1. Added separate `Purpose`, `Coverage`, and `Target effect` comments immediately above every Fact/Theory in `DpiGeometryPolicyTests.cs` and `PetPlacementPolicyTests.cs`. This includes the DIP ceiling, coordinate rounding, and physical-unit policy coverage called out in review.
+2. `PetPlacementPolicy.Clamp` now rejects non-finite or non-positive window extents, non-finite requested coordinates, non-finite origins/extents or non-positive work-area dimensions, and non-finite/negative visible margins with `ArgumentOutOfRangeException`. Negative finite work-area/request coordinates remain valid. Derived work-area edges and clamp limits are also checked for finite arithmetic results.
+3. Strengthened `Topology_change_moves_pet_from_missing_monitor_to_primary_fallback`: the fake HWND changes from 96 DPI to 144 DPI after enumeration drops the secondary. The expected rectangle is `PhysicalRect(-370, 100, 20, 415)` (390 x 315 pixels), rather than the old-DPI 260 x 210 extents. The existing service already reads `GetDpi(hwnd)` on each reconciliation before fallback, so this review item required regression coverage but no service implementation change.
+
+### TDD RED/GREEN evidence
+
+RED command, run after adding the invalid-input cases and before changing `PetPlacementPolicy.Clamp`:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --filter "FullyQualifiedName~PetPlacementPolicyTests|FullyQualifiedName~DpiGeometryPolicyTests|FullyQualifiedName~Topology_change_moves_pet_from_missing_monitor_to_primary_fallback" -m:1 /nodeReuse:false
+```
+
+Observed exit code: 1. Exact test summary: `失败!  - 失败: 4，通过: 21，已跳过: 0，总计: 25`. The four expected failures were `Clamp_rejects_invalid_work_area_geometry`, `Clamp_rejects_non_finite_requested_coordinates`, `Clamp_rejects_non_finite_pet_dimensions`, and `Clamp_rejects_non_finite_visible_margin`; each reported `Assert.Throws() Failure: No exception was thrown` and expected `System.ArgumentOutOfRangeException`. The strengthened topology/DPI regression passed against the existing live-DPI implementation.
+
+GREEN command after adding finite/positive checks:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --filter "FullyQualifiedName~PetPlacementPolicyTests|FullyQualifiedName~DpiGeometryPolicyTests|FullyQualifiedName~Topology_change_moves_pet_from_missing_monitor_to_primary_fallback" -m:1 /nodeReuse:false
+```
+
+Exact test summary: `已通过! - 失败: 0，通过: 25，已跳过: 0，总计: 25` (exit code 0).
+
+Isolated DPI topology regression:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --filter "FullyQualifiedName~Topology_change_moves_pet_from_missing_monitor_to_primary_fallback" -m:1 /nodeReuse:false
+```
+
+Exact test summary: `已通过! - 失败: 0，通过: 1，已跳过: 0，总计: 1` (exit code 0).
+
+### Fix round verification
+
+Focused placement, service, and geometry tests:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --filter "FullyQualifiedName~PetWindowPlacementServiceTests|FullyQualifiedName~PetPlacementPolicyTests|FullyQualifiedName~DpiGeometryPolicyTests" -m:1 /nodeReuse:false
+```
+
+Exact test summary: `已通过! - 失败: 0，通过: 30，已跳过: 0，总计: 30` (exit code 0).
+
+Native geometry and adapter contract tests:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --filter "FullyQualifiedName~MonitorDisplayContractTests|FullyQualifiedName~Win32MonitorDisplayProviderTests|FullyQualifiedName~Win32WindowPositionerTests" -m:1 /nodeReuse:false
+```
+
+Exact test summary: `已通过! - 失败: 0，通过: 10，已跳过: 0，总计: 10` (exit code 0).
+
+Full unit test project:
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release -m:1 /nodeReuse:false
+```
+
+Exact test summary: `已通过! - 失败: 0，通过: 150，已跳过: 0，总计: 150` (exit code 0).
+
+Application Release build:
+
+```text
+dotnet build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release -m:1 /nodeReuse:false
+```
+
+Exact result: `已成功生成。 0 个警告 0 个错误` (exit code 0).
+
+`git diff --check` passes after removing trailing blank lines. Git emits only its configured LF-to-CRLF notices for the changed text files.
+
+### Files changed in Fix round 1
+
+- `src/DesktopPuppy/Pet/Placement/PetPlacementPolicy.cs`
+- `tests/DesktopPuppy.Tests/PetPlacementPolicyTests.cs`
+- `tests/DesktopPuppy.Tests/Pet/DpiGeometryPolicyTests.cs`
+- `tests/DesktopPuppy.Tests/Pet/PetWindowPlacementServiceTests.cs`
+- `.superpowers/sdd/2026-09-28-monitor-dpi-placement-acceptance-plan/task-3-report.md`
+
+No Task 1/2/4 files, App/PetWindow/manifest wiring, hardware acceptance, or unrelated files were changed. No unresolved review concern remains.
