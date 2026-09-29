@@ -577,7 +577,7 @@ Unit tests: 101 passed, 0 failed
 Windows UI tests: 11 passed, 0 failed
 ```
 
-The UI test project must run on an interactive Windows desktop and requires `DESKTOP_PUPPY_EXE` to point to the built app. These tests verify windows, UI Automation, seeded reports, and startup retention; they do not verify actual operating-system lock/suspend notification delivery or visually wait through the 30-second refresh interval.
+The UI test project must run on an interactive Windows desktop and requires `DESKTOP_PUPPY_EXE` to point to the built app. These tests verify windows, UI Automation, seeded reports, and startup retention; they do not verify actual operating-system lock/suspend notification delivery. The real 30-second timer refresh has since been verified separately by the long-running E2E recorded below; local-midnight rollover remains a separate manual check.
 
 ### Remaining verification and feature work
 
@@ -615,3 +615,34 @@ Unit tests: 101 passed, 0 failed
 `Statistics_window_refreshes_new_sqlite_data_on_its_real_timer` seeds `Yesterday` 09:00 local for 30 minutes of `BrowserApp`, waits for the displayed total `0 小时 30 分钟`, then appends a closed 15-minute `RefreshProbeApp` row on the same local date through a separate SQLite connection while the real window stays open. It then polls only Automation ID names read-only for at most 60 seconds, confirming `0 小时 45 分钟` and the `RefreshProbeApp` application row, with the pet process still running, the statistics window onscreen, and exactly one `UsageStatisticsWindow`. The 33-second run reflects the product's real 30-second `DispatcherTimer`; no focus, activation, reopen, or invocation occurs after the second insert.
 
 This test verifies the timer-driven statistics refresh only. It does not verify operating-system lock/power notification delivery or monitor/DPI behavior, and the broader PRD acceptance matrix remains incomplete.
+
+
+## Windows session/power acceptance harness — 2026-09-28
+
+The opt-in visible acceptance controller documents two operator-driven Windows scenarios: actual lock/unlock and generic suspend/resume. It requires explicit opt-in, an absolute product executable path, and no already-running `DesktopPuppy` process. The controller never initiates OS transitions. Both manual scenarios remain **Not run**; no live Windows lock/unlock or suspend/resume notification delivery is claimed. The suspend source reports generic Suspend/Resume, not sleep-versus-hibernate classification.
+
+### Fresh verification at Task 5
+
+Commands were run from the isolated worktree `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy` at base `1220f980da7981049f25bcb1297c3863b5e0b11e`:
+
+```powershell
+dotnet build DesktopPuppy.sln --configuration Release --no-restore
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore
+```
+
+- **Full unit suite:** 121 passed, 0 failed, 0 skipped. This includes Task 4's distinct pre-suspend/resumed-fixture regression.
+- **Fresh Release solution/controller build:** attempted twice; **not verified**. Both attempts failed when WPF markup compilation could not access its generated `.obj` cache (`Access to the path ... DesktopPuppy.WindowsAcceptance_MarkupCompile.cache is denied`; the first attempt reported the analogous product markup cache, and the intermediate full-unit run succeeded). The build reported 0 warnings and 1 error. Do not treat this as a passing build.
+- **Latest safe UI smoke (2026-09-28, Task 4):** `DesktopPuppyWindowUiTests` 1/1 passed in a separate historical run. This smoke is not the full UI category.
+- **Historical full `Category=Ui` result (2026-09-26):** 11/11 passed before the Task 4/5 changes. A post-acceptance full-category rerun is **Not run** because interaction tests use `SendInput` on the active desktop. The Task 4 report's failed prerequisite attempt is not a UI suite result.
+- **Real 30-second refresh E2E (2026-09-28):** 1/1 passed in 33 seconds in a separate long-running category. This is not hardware power-event verification.
+- Actual Windows lock/unlock: **Not run**. Actual Windows suspend/resume: **Not run**. Manual verification is still required.
+
+The historical 11/11 UI suite, later 1/1 safe smoke, 1/1 long-running timer E2E, and fresh 121-test unit run are separate scopes/runs; none should be combined or described as a post-change full UI pass. Unit tests with injected event providers/validator inputs verify deterministic routing and boundaries only; they do not prove live OS event delivery.
+
+The manual acceptance status vocabulary is distinct: **Not run** means no operator execution has been recorded; **Skipped** means prerequisites/opt-in prevented a run; **Incomplete** means a started run was cancelled or timed out; **Failed** means observed evidence violated the acceptance rules; and **Passed** requires actual ordered OS notifications, matching isolated persisted boundaries, and operator confirmation.
+
+The 30-second statistics refresh has been exercised by the real long-running timer E2E described above. Verification across actual local midnight remains a distinct **Not run** manual check; injected-clock rollover tests do not replace it.
+
+### Safety review
+
+Reviewed the acceptance controller, event observer, owned-directory helper, and product database path selection. The harness has no API calls that initiate lock/unlock/sleep/wake, no credential APIs, and no synthetic/system-event injection path used to obtain an acceptance pass. Unit-level fake event tests remain simulations and are not reported as hardware acceptance. Temporary cleanup is guarded to the unique per-run child under the harness-owned temp root and refuses reparse-point replacement; if owned children cannot be stopped, cleanup retains the directory. The acceptance controller initializes and queries only its run-owned SQLite database passed explicitly to the isolated product process; it does not open the production database. No actual OS transition or input injection was performed for this documentation task.

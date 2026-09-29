@@ -72,3 +72,28 @@ On cancel or completion, the run closes its event observer and owned child-proce
 5. Cancel or allow the awake-time deadline to expire to produce **Incomplete**, never **Passed**. A pass requires both real notifications, closed persisted boundaries, and operator confirmation.
 
 Builds and existing unit/UI tests do not launch this manual flow or perform a system transition. Real Windows suspend/resume verification remains **Not run** until an operator completes the steps above.
+
+
+## Current verification status — 2026-09-28
+
+This harness is opt-in and operator-driven. Its controller build and automated tests do not start the manual scenarios. Actual Windows lock/unlock and suspend/resume acceptance are both **Not run** and remain so until an operator completes the corresponding scenario on Windows. Injected-provider/unit tests do not establish that Windows delivered real notifications.
+
+Statuses are intentionally distinct:
+
+- **Not run:** no operator execution has been recorded for that scenario.
+- **Skipped:** opt-in or a preflight prerequisite prevented starting the scenario; this is not a pass.
+- **Incomplete:** a started scenario was cancelled or reached its deadline before all required evidence/confirmation; this is not a pass.
+- **Failed:** real observed events or persisted session boundaries contradict the scenario rules.
+- **Passed:** only after the required real ordered OS notifications, isolated persisted session edges, and operator confirmation satisfy the scenario.
+
+### Automated evidence (separate runs and scopes)
+
+- **2026-09-28 — full unit suite after the Task 4 suspend regression:** `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore` — **121 passed, 0 failed, 0 skipped**.
+- **2026-09-28 — fresh Release solution/controller build:** `dotnet build DesktopPuppy.sln --configuration Release --no-restore` was attempted twice and did **not** pass verification. WPF markup compilation failed with access denied writing generated `.obj` markup cache files; the final attempt reported 0 warnings and 1 error. This does not establish a successful fresh controller/solution build.
+- **2026-09-28 — safe UI smoke, historical Task 4 run:** `DesktopPuppyWindowUiTests` — **1/1 passed**. This is not the full UI category.
+- **2026-09-26 — historical full `Category=Ui` run:** **11/11 passed** before the acceptance changes. The full category has **Not run** after these changes. It is intentionally not rerun here because its interaction tests use `SendInput` on the active desktop.
+- **2026-09-28 — separate real-timer E2E:** `Category=LongRunningE2E` — **1/1 passed in 33 seconds**, confirming the actual 30-second statistics refresh. This does not verify lock/power delivery.
+
+The 30-second timer refresh has real long-running automated evidence. Local-midnight rollover is separate: actual midnight behavior remains **Not run** manually. Do not infer it from injected-clock tests.
+
+Do not combine the historical 11/11 UI result, distinct 1/1 safe smoke, long-running timer test, or current unit-suite result into a claim that the full UI suite passed after the acceptance branch changes.
