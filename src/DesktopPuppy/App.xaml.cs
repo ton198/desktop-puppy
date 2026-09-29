@@ -4,6 +4,7 @@ using System.Windows;
 using DesktopPuppy.Core.Clock;
 using DesktopPuppy.Native;
 using DesktopPuppy.Pet;
+using DesktopPuppy.Pet.Placement;
 using DesktopPuppy.Pet.Statistics;
 using DesktopPuppy.Usage;
 
@@ -21,6 +22,8 @@ public partial class App : Application
     private Timer? _usageRetentionCheckTimer;
     private IUsageStatisticsQuery? _usageStatisticsQuery;
     private UsageStatisticsWindow? _usageStatisticsWindow;
+    private Win32MonitorDisplayProvider? _monitorDisplayProvider;
+    private PetWindowPlacementService? _petWindowPlacementService;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,7 +40,8 @@ public partial class App : Application
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         StartUsageTracking();
 
-        _petWindow = new PetWindow();
+        InitializePetWindowPlacement();
+        _petWindow = new PetWindow(_petWindowPlacementService, _monitorDisplayProvider);
         _petWindow.StatisticsRequested += PetWindow_OnStatisticsRequested;
         MainWindow = _petWindow;
         _petWindow.Show();
@@ -65,7 +69,86 @@ public partial class App : Application
         _usageStore = null;
         _singleInstanceGuard?.Dispose();
         _singleInstanceGuard = null;
+        try
+        {
+            _petWindowPlacementService?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Pet placement service cleanup failed: {exception}");
+        }
+        finally
+        {
+            _petWindowPlacementService = null;
+        }
+
+        try
+        {
+            _monitorDisplayProvider?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Monitor display provider cleanup failed: {exception}");
+        }
+        finally
+        {
+            _monitorDisplayProvider = null;
+        }
+
         base.OnExit(e);
+    }
+
+    private void InitializePetWindowPlacement()
+    {
+        Win32MonitorDisplayProvider? monitors = null;
+        try
+        {
+            monitors = new Win32MonitorDisplayProvider();
+            var nativeWindows = new Win32WindowPositioner(new Win32WindowApi(), monitors);
+            var windows = new InitialPrimaryMonitorPositioner(monitors, nativeWindows);
+            var placement = new PetWindowPlacementService(monitors, windows);
+            _monitorDisplayProvider = monitors;
+            _petWindowPlacementService = placement;
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                monitors?.Dispose();
+            }
+            catch (Exception disposeException)
+            {
+                Debug.WriteLine($"Monitor provider cleanup after initialization failure also failed: {disposeException}");
+            }
+
+            Debug.WriteLine($"Native pet placement initialization failed; keeping WPF startup placement: {exception}");
+            _monitorDisplayProvider = null;
+            _petWindowPlacementService = null;
+        }
+    }
+
+    private sealed class InitialPrimaryMonitorPositioner(
+        IMonitorDisplayProvider monitors,
+        INativeWindowPositioner inner) : INativeWindowPositioner
+    {
+        private bool _initialMonitorRead = true;
+
+        public PhysicalRect GetBounds(IntPtr hwnd) => inner.GetBounds(hwnd);
+
+        public MonitorDisplayInfo GetMonitorForWindow(IntPtr hwnd)
+        {
+            if (_initialMonitorRead)
+            {
+                _initialMonitorRead = false;
+                return monitors.GetMonitors().First(monitor => monitor.IsPrimary);
+            }
+
+            return inner.GetMonitorForWindow(hwnd);
+        }
+
+        public uint GetDpi(IntPtr hwnd) => inner.GetDpi(hwnd);
+
+        public void SetBounds(IntPtr hwnd, PhysicalRect bounds) => inner.SetBounds(hwnd, bounds);
     }
 
     private void StartUsageTracking()

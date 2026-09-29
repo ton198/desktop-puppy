@@ -1,10 +1,14 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Input;
 using System.Windows.Threading;
+using DesktopPuppy.Native;
 using DesktopPuppy.Pet.Interaction;
+using DesktopPuppy.Pet.Placement;
 
 namespace DesktopPuppy.Pet;
 
@@ -23,14 +27,32 @@ public partial class PetWindow : Window
 
     private readonly DispatcherTimer _interactionTimer;
     private readonly InteractionController _interactionController;
+    private readonly PetWindowPlacementService? _placementService;
+    private readonly IMonitorDisplayProvider? _monitorDisplayProvider;
+    private IntPtr _hwnd;
+    private bool _reconcileQueued;
+    private bool _closed;
     private int _lineIndex;
     private bool _dragStarted;
 
     public event EventHandler? StatisticsRequested;
 
-    public PetWindow()
+    public PetWindow(
+        PetWindowPlacementService? placementService = null,
+        IMonitorDisplayProvider? monitorDisplayProvider = null)
     {
         InitializeComponent();
+        _placementService = placementService;
+        _monitorDisplayProvider = monitorDisplayProvider;
+
+        SourceInitialized += PetWindow_OnSourceInitialized;
+        Loaded += PetWindow_OnLoaded;
+        LocationChanged += PetWindow_OnLocationChanged;
+        DpiChanged += PetWindow_OnDpiChanged;
+        if (_monitorDisplayProvider is not null)
+        {
+            _monitorDisplayProvider.DisplaySettingsChanged += MonitorDisplayProvider_OnDisplaySettingsChanged;
+        }
 
         _interactionController = new InteractionController(
             new PetInteractionPolicy(TimeSpan.FromSeconds(1)),
@@ -49,6 +71,110 @@ public partial class PetWindow : Window
     {
         _interactionTimer.Stop();
         base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _closed = true;
+        if (_monitorDisplayProvider is not null)
+        {
+            _monitorDisplayProvider.DisplaySettingsChanged -= MonitorDisplayProvider_OnDisplaySettingsChanged;
+        }
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            try
+            {
+                _placementService?.Forget(_hwnd);
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Pet window placement cleanup failed: {exception}");
+            }
+        }
+
+        base.OnClosed(e);
+    }
+
+    private void PetWindow_OnSourceInitialized(object? sender, EventArgs e)
+    {
+        _hwnd = new WindowInteropHelper(this).Handle;
+    }
+
+    private void PetWindow_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (_placementService is null || _hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            _placementService.ApplyInitial(_hwnd, ActualWidth, ActualHeight);
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Initial native pet placement failed; keeping WPF startup placement: {exception}");
+        }
+    }
+
+    private void PetWindow_OnLocationChanged(object? sender, EventArgs e) => QueuePlacementReconcile();
+
+    private void PetWindow_OnDpiChanged(object sender, DpiChangedEventArgs e) => QueuePlacementReconcile();
+
+    private void MonitorDisplayProvider_OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        try
+        {
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(QueuePlacementReconcile));
+        }
+        catch (InvalidOperationException exception)
+        {
+            Debug.WriteLine($"Display-change notification could not be dispatched during shutdown: {exception}");
+        }
+    }
+
+    private void QueuePlacementReconcile()
+    {
+        if (_closed || !IsLoaded || _hwnd == IntPtr.Zero || _placementService is null || _reconcileQueued ||
+            Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+        {
+            return;
+        }
+
+        _reconcileQueued = true;
+        try
+        {
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new Action(() =>
+                {
+                    _reconcileQueued = false;
+                    if (_closed || !IsLoaded || _hwnd == IntPtr.Zero)
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        _placementService.Reconcile(_hwnd, ActualWidth, ActualHeight);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.WriteLine($"Native pet placement reconciliation failed; preserving the current WPF position: {exception}");
+                    }
+                }));
+        }
+        catch (InvalidOperationException exception)
+        {
+            _reconcileQueued = false;
+            Debug.WriteLine($"Pet placement reconciliation could not be dispatched during shutdown: {exception}");
+        }
     }
 
     private void PetWindow_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
