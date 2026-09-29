@@ -4,19 +4,21 @@
         Title="Desktop Puppy Windows acceptance" Width="760" Height="680" MinWidth="620" MinHeight="560">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="24">
-      <TextBlock Text="Windows session and power acceptance" FontSize="22" FontWeight="Bold" Margin="0,0,0,12"/>
-      <TextBlock Text="Manual, opt-in acceptance only. The operator alone initiates lock, unlock, sleep, wake, and sign-in. The utility never locks or sleeps the machine." TextWrapping="Wrap" Margin="0,0,0,14"/>
-      <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-        <Button x:Name="LockScenario" Content="Run lock/unlock acceptance" Click="ChooseLock" Margin="0,0,12,0" Padding="10,6"/>
-        <Button x:Name="PowerScenario" Content="Run suspend/resume acceptance" Click="ChoosePower" Padding="10,6"/>
-      </StackPanel>
+      <TextBlock Text="Windows and display acceptance" FontSize="22" FontWeight="Bold" Margin="0,0,0,12"/>
+      <TextBlock Text="Manual, opt-in acceptance only. The operator alone initiates system transitions and manually drags the pet between displays. The utility never injects input, changes display settings, locks, or sleeps the machine." TextWrapping="Wrap" Margin="0,0,0,14"/>
+      <WrapPanel Margin="0,0,0,12">
+        <Button x:Name="LockScenario" Content="Run lock/unlock acceptance" Click="ChooseLock" Margin="0,0,12,8" Padding="10,6"/>
+        <Button x:Name="PowerScenario" Content="Run suspend/resume acceptance" Click="ChoosePower" Margin="0,0,12,8" Padding="10,6"/>
+        <Button x:Name="DisplayScenarioButton" Content="Run mixed-DPI display acceptance" Click="ChooseDisplay" Margin="0,0,12,8" Padding="10,6"/>
+      </WrapPanel>
       <TextBlock x:Name="ScenarioSummary" Text="Choose a scenario to view Purpose, Coverage, and Target effect." TextWrapping="Wrap" Margin="0,0,0,8"/>
       <TextBlock x:Name="Instructions" Text="Choose a scenario to view its manual instructions." TextWrapping="Wrap" Margin="0,0,0,16"/>
-      <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+      <WrapPanel Margin="0,0,0,16">
         <Button x:Name="BeginButton" Content="Begin isolated scenario" Click="Begin" IsEnabled="False" Padding="12,6" Margin="0,0,12,0"/>
         <Button x:Name="CompleteButton" Content="Confirm fixture switches complete" Click="Complete" IsEnabled="False" Padding="12,6" Margin="0,0,12,0"/>
         <Button x:Name="CancelButton" Content="Cancel" Click="Cancel" IsEnabled="False" Padding="12,6"/>
-      </StackPanel>
+        <Button x:Name="CaptureDisplayButton" Content="I moved the pet — capture display observation" Click="CaptureDisplayObservation" IsEnabled="False" Padding="10,6"/>
+      </WrapPanel>
       <TextBlock Text="Result state" FontWeight="Bold"/>
       <TextBlock x:Name="ResultState" Text="Not started" FontSize="18" Margin="0,4,0,8"/>
       <TextBlock x:Name="ResultDetail" TextWrapping="Wrap"/>

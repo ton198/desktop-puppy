@@ -97,3 +97,52 @@ Statuses are intentionally distinct:
 The 30-second timer refresh has real long-running automated evidence. Local-midnight rollover is separate: actual midnight behavior remains **Not run** manually. Do not infer it from injected-clock tests.
 
 Do not combine the historical 11/11 UI result, distinct 1/1 safe smoke, long-running timer test, or current unit-suite result into a claim that the full UI suite passed after the acceptance branch changes.
+
+## E2E-DISPLAY-01 — Opt-in mixed-DPI placement
+
+**Purpose:** Verify the real WPF pet placement path against actual monitor geometry and per-window DPI.
+
+**Coverage:** The operator manually moves the same Release app pet HWND to two connected displays and confirms each capture. UI Automation locates the `PetWindow` AutomationId under the isolated app PID; the utility revalidates that PID and AutomationId for the same HWND at each observation. Native monitor enumeration, HWND bounds, containing monitor, work area, and `GetDpiForWindow` are read through the product Native provider/positioner.
+
+**Target effect:** With distinct measured DPI values, each capture must be on the requested run-local display alias, have the DPI-scaled physical WPF size, match `PetPlacementPolicy` edge clamping, and retain at least 20 visible physical pixels. Equal nonzero DPI measurements on the same HWND always produce **Skipped** and include the measured values.
+
+### Prerequisites and opt-in
+
+- Windows in a local interactive desktop session (not Remote Desktop).
+- At least two enumerated connected displays.
+- Set both `DESKTOP_PUPPY_WINDOWS_ACCEPTANCE=1` and `DESKTOP_PUPPY_DISPLAY_ACCEPTANCE=1` in the current PowerShell session.
+- Set `DESKTOP_PUPPY_EXE` to the absolute path of the Release `DesktopPuppy.exe` to observe.
+- No unrelated `DesktopPuppy` instance may already be running. The controller leaves an existing instance untouched and skips before creating the private run database or starting a child app.
+
+Example configuration and build (building does not run the acceptance utility):
+
+```powershell
+$env:DESKTOP_PUPPY_WINDOWS_ACCEPTANCE = '1'
+$env:DESKTOP_PUPPY_DISPLAY_ACCEPTANCE = '1'
+$env:DESKTOP_PUPPY_EXE = 'C:\path\to\desktop-puppy\src\DesktopPuppy\bin\Release\net10.0-windows\DesktopPuppy.exe'
+dotnet build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release
+dotnet build tests/DesktopPuppy.WindowsAcceptance/DesktopPuppy.WindowsAcceptance.csproj --configuration Release
+```
+
+Open `tests/DesktopPuppy.WindowsAcceptance/bin/Release/net10.0-windows/DesktopPuppy.WindowsAcceptance.exe` interactively only when ready for the manual scenario. The standalone utility is not started by xUnit, the default UI filter, or either build command. Missing opt-in, a nonlocal/noninteractive session, fewer than two displays, invalid executable prerequisites, or an existing product process results in **Skipped** before the isolated app/run database is created. Selecting the display scenario may create a read-only provider to enumerate displays; every skip path disposes it.
+
+### Manual steps
+
+1. Choose **Run mixed-DPI display acceptance** and review the displayed Purpose, Coverage, and Target effect.
+2. Choose **Begin isolated mixed-DPI display scenario**. Prerequisites are checked again before creating a private temporary database or starting the isolated Release app.
+3. After the isolated pet appears, manually drag that same pet window near an edge on **Display 1**. Let the product's normal DPI/location reconciliation settle, then press the matching confirmation/capture button.
+4. Manually drag the same pet window to **Display 2**, allow reconciliation to settle, and confirm the second capture. The utility rejects a changed HWND, process PID, AutomationId, or containing-monitor mismatch.
+5. Review the result. **Passed** requires distinct measured DPI, matching physical geometry, policy-compliant position, and 20-pixel visibility on both displays. Equal DPI reports **Skipped** with the measured display aliases and DPI values. Cancel or timeout never passes.
+
+The acceptance utility does not inject input, call `SetWindowPos`, change display settings, or infer placement from screenshot pixels. It reports run-local display aliases, DPI, bounds, work areas, and status only; raw device IDs, HWND values, unrelated window titles, and user activity are not output. The app and database are private to this run. Cleanup deletes the owned directory only after the app process is affirmatively confirmed exited. If stopping the child fails or exit cannot be confirmed, the run directory is retained and the scenario/provider is still disposed; do not remove that retained directory until the child is confirmed stopped.
+
+Actual mixed-DPI hardware verification remains **Not run** until an operator performs these steps on a qualifying setup. Deterministic fake-backed tests do not count as hardware acceptance.
+
+
+### Task 5 verification record
+
+- Cleanup regression **RED** before the fix: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore --filter FullyQualifiedName~Failed_display_child_cleanup_retains_run_directory_and_disposes_provider --verbosity minimal` failed at `Assert.False(deleted)` because the unsafe cleanup path deleted the directory after stop failed.
+- Cleanup regression **GREEN** after the fix: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore -m:1 /nodeReuse:false --filter FullyQualifiedName~Failed_display_child_cleanup_retains_run_directory_and_disposes_provider --verbosity minimal` — 1 passed, 0 failed, 0 skipped. The test covers stop exception, unconfirmed exit, confirmed exit, and scenario/provider disposal.
+- Release builds: `dotnet build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release --no-restore -m:1 /nodeReuse:false` and `dotnet build tests/DesktopPuppy.WindowsAcceptance/DesktopPuppy.WindowsAcceptance.csproj --configuration Release --no-restore -m:1 /nodeReuse:false` — both succeeded with 0 warnings and 0 errors.
+- Full deterministic suite: `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore -m:1 /nodeReuse:false --verbosity minimal` — 162 passed, 0 failed, 0 skipped.
+- `Category=Ui` was **Not run** because its interaction tests inject `SendInput` into the live desktop. The acceptance executable was not launched and no display hardware or topology was manipulated; E2E-DISPLAY-01 hardware acceptance is **Not run**. These automated checks do not establish real monitor/DPI behavior.

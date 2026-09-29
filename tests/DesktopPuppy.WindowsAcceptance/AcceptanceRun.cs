@@ -457,3 +457,122 @@ internal sealed class AcceptanceAwakeTimeBudget
         }
     }
 }
+
+
+internal sealed class DisplayAcceptanceRun : IAsyncDisposable
+{
+    private readonly AcceptanceOwnedDirectory owner;
+    private readonly Process app;
+    private readonly DisplayAcceptanceScenario scenario;
+    private int disposed;
+
+    private DisplayAcceptanceRun(
+        AcceptanceOwnedDirectory owner,
+        Process app,
+        DisplayAcceptanceScenario scenario,
+        IntPtr petHwnd)
+    {
+        this.owner = owner;
+        this.app = app;
+        this.scenario = scenario;
+        PetHwnd = petHwnd;
+    }
+
+    internal IntPtr PetHwnd { get; }
+    internal uint ProductProcessId => checked((uint)app.Id);
+    internal bool IsProductRunning => !app.HasExited;
+
+    internal static async Task<DisplayAcceptanceRun> StartAsync(
+        string appExecutablePath,
+        DisplayAcceptanceScenario scenario,
+        CancellationToken cancellationToken,
+        Func<string?> additionalPreflight)
+    {
+        ArgumentNullException.ThrowIfNull(scenario);
+        ArgumentNullException.ThrowIfNull(additionalPreflight);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var reason = additionalPreflight();
+        if (reason is not null) throw new AcceptanceSkippedException(reason);
+        reason = WindowsAcceptancePrerequisite.SkipReason();
+        if (reason is not null) throw new AcceptanceSkippedException(reason);
+        if (!string.Equals(Path.GetFullPath(appExecutablePath),
+                Path.GetFullPath(Environment.GetEnvironmentVariable("DESKTOP_PUPPY_EXE")!), StringComparison.OrdinalIgnoreCase))
+            throw new AcceptanceSkippedException("Product executable changed since prerequisite check.");
+
+        AcceptanceOwnedDirectory? owner = null;
+        Process? app = null;
+        try
+        {
+            // All opt-in, local-session, executable/process, and monitor-count gates run before this allocation.
+            owner = AcceptanceOwnedDirectory.Create();
+            var databasePath = Path.GetFullPath(owner.DatabasePath);
+            var databaseDirectory = Path.GetDirectoryName(databasePath)!;
+            if (!Directory.Exists(databaseDirectory))
+                throw new IOException("The owned display acceptance directory is unavailable.");
+            using (var store = new UsageSqliteStore(databasePath)) store.Initialize();
+            if (!File.Exists(databasePath))
+                throw new IOException("The isolated display acceptance database was not created.");
+            cancellationToken.ThrowIfCancellationRequested();
+
+            app = Process.Start(new ProcessStartInfo(appExecutablePath)
+            {
+                WorkingDirectory = Path.GetDirectoryName(appExecutablePath),
+                UseShellExecute = false,
+                Environment = { ["DESKTOP_PUPPY_USAGE_DB_PATH"] = databasePath }
+            }) ?? throw new InvalidOperationException("The isolated product process could not start.");
+            var petHwnd = await scenario.WaitForPetWindowHandleAsync(
+                checked((uint)app.Id),
+                () => !app.HasExited,
+                cancellationToken);
+            if (app.HasExited)
+                throw new InvalidOperationException("The isolated product exited while its pet HWND was being discovered.");
+            return new DisplayAcceptanceRun(owner, app, scenario, petHwnd);
+        }
+        catch
+        {
+            await DisplayAcceptanceRunCleanup.CleanupAsync(
+                () => StopOwnedAppAsync(app),
+                () => owner?.DeleteOwned(),
+                scenario.Dispose);
+            throw;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        await DisplayAcceptanceRunCleanup.CleanupAsync(
+            () => StopOwnedAppAsync(app),
+            owner.DeleteOwned,
+            scenario.Dispose);
+    }
+
+    private static async Task<bool> StopOwnedAppAsync(Process? child)
+    {
+        if (child is null) return true;
+        try
+        {
+            if (!child.HasExited)
+            {
+                child.CloseMainWindow();
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try { await child.WaitForExitAsync(timeout.Token); }
+                catch (OperationCanceledException)
+                {
+                    if (!child.HasExited) child.Kill();
+                    await child.WaitForExitAsync();
+                }
+            }
+            return child.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            // Treat an invalid process handle as unconfirmed, not as proof that the child exited.
+            try { return child.HasExited; }
+            catch (InvalidOperationException) { return false; }
+        }
+        catch (Win32Exception ex) { throw new IOException("Could not stop the owned display acceptance app.", ex); }
+        finally { child.Dispose(); }
+    }
+}

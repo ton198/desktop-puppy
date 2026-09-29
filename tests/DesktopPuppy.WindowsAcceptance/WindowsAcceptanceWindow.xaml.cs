@@ -11,7 +11,13 @@ public partial class WindowsAcceptanceWindow : Window
     private CancellationTokenSource? startCancellation;
     private CancellationTokenSource? scenarioCancellation;
     private Task<AcceptanceRun>? pendingStartup;
+    private Task<DisplayAcceptanceRun>? pendingDisplayStartup;
     private Task? pendingScenario;
+    private DisplayAcceptanceRun? displayRun;
+    private DisplayAcceptanceScenario? displayScenario;
+    private IReadOnlyList<DisplayAcceptanceMonitor>? displayMonitors;
+    private readonly List<DisplayAcceptanceObservation> displayObservations = [];
+    private IntPtr displayPetHwnd;
     private TimeSpan stepTimeout;
     private bool timeoutConfigurationValid;
     private bool closing;
@@ -40,11 +46,13 @@ public partial class WindowsAcceptanceWindow : Window
         CompleteButton.IsEnabled = false;
         LockScenario.IsEnabled = false;
         PowerScenario.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
         return false;
     }
 
     private void ChooseLock(object sender, RoutedEventArgs e)
     {
+        DisposeDisplayScenario();
         scenario = "lock";
         BeginButton.Content = "Begin isolated lock scenario";
         ScenarioSummary.Text = "E2E-POWER-01 — Real lock/unlock session split.\n\n" +
@@ -61,6 +69,7 @@ public partial class WindowsAcceptanceWindow : Window
 
     private void ChoosePower(object sender, RoutedEventArgs e)
     {
+        DisposeDisplayScenario();
         scenario = "power";
         ScenarioSummary.Text = "E2E-POWER-02 — Real suspend/resume session split.\n\n" +
             "Purpose: verify actual Windows Suspend/Resume notifications reach the app and collection restarts after the machine resumes.\n\n" +
@@ -76,8 +85,61 @@ public partial class WindowsAcceptanceWindow : Window
             ? "No suspend, resume, unlock, or input action will be initiated by this utility."
             : "Timeout configuration is invalid. Use a whole number from 1 to 120 minutes.";
     }
+    private void ChooseDisplay(object sender, RoutedEventArgs e)
+    {
+        DisposeDisplayScenario();
+        scenario = "display";
+        displayScenario = new DisplayAcceptanceScenario(new ReadOnlyDisplayAcceptanceNativeApi());
+        displayObservations.Clear();
+        displayPetHwnd = IntPtr.Zero;
+        displayMonitors = null;
+        BeginButton.Content = "Begin isolated mixed-DPI display scenario";
+        CompleteButton.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
+        ScenarioSummary.Text = "E2E-DISPLAY-01 — Mixed DPI placement.\n\n" +
+            "Purpose: Prove the real WPF pet placement path uses actual display geometry and DPI conversion rather than only pure policy tests.\n\n" +
+            "Coverage: At least two connected displays; the same Release app HWND manually dragged by the operator to each display; read-only GetDpiForWindow, physical bounds, containing display, work area, and edge-clamp observations.\n\n" +
+            "Target effect: Distinct DPI values are observed on the same HWND; the pet remains on each requested display with DPI-scaled physical bounds and at least 20 visible pixels. Equal measured DPI values report Skipped with the measured reason.";
+        Instructions.Text = "The utility first checks both opt-in flags, a local interactive session, and at least two connected displays before creating a run database or starting Desktop Puppy. After Begin, manually drag the same pet window near an edge on each named display, let WPF placement settle, then use the matching confirmation button to capture read-only UIA/native geometry. The utility never injects input, calls SetWindowPos, or changes display settings.";
+
+        var skipReason = GetDisplayPrerequisiteSkipReason();
+        if (skipReason is not null)
+        {
+            ShowResult(AcceptanceStatus.Skipped, skipReason);
+            DisposeDisplayScenario();
+            return;
+        }
+
+        ResultState.Text = "Not started";
+        ResultDetail.Text = "Display prerequisites passed. No product process or run database has been created.";
+        BeginButton.IsEnabled = timeoutConfigurationValid;
+        LockScenario.IsEnabled = true;
+        PowerScenario.IsEnabled = true;
+        DisplayScenarioButton.IsEnabled = true;
+    }
+
+    private string? GetDisplayPrerequisiteSkipReason()
+    {
+        if (displayScenario is null) return "Display acceptance scenario is unavailable.";
+        var windowsOptIn = Environment.GetEnvironmentVariable("DESKTOP_PUPPY_WINDOWS_ACCEPTANCE");
+        var displayOptIn = Environment.GetEnvironmentVariable("DESKTOP_PUPPY_DISPLAY_ACCEPTANCE");
+        if (windowsOptIn != "1" || displayOptIn != "1")
+            return displayScenario.CheckPrerequisites(windowsOptIn, displayOptIn, true, 0);
+
+        var sessionReason = WindowsAcceptancePrerequisite.SessionSkipReason();
+        if (sessionReason is not null) return sessionReason;
+        var displayReason = displayScenario.CheckPrerequisites(
+            windowsOptIn, displayOptIn, Environment.UserInteractive, remoteSessionMetric: 0);
+        return displayReason ?? WindowsAcceptancePrerequisite.SkipReason();
+    }
+
     private async void Begin(object sender, RoutedEventArgs e)
     {
+        if (scenario == "display")
+        {
+            await BeginDisplayAsync();
+            return;
+        }
         if (scenario is not ("lock" or "power") || !CheckPrerequisites()) return;
         if (!AcceptanceStepTimeout.TryRead(
                 Environment.GetEnvironmentVariable("DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES"), out stepTimeout))
@@ -128,6 +190,170 @@ public partial class WindowsAcceptanceWindow : Window
             pendingStartup = null;
         }
     }
+
+    private async Task BeginDisplayAsync()
+    {
+        if (displayScenario is null) return;
+        var displaySkipReason = GetDisplayPrerequisiteSkipReason();
+        if (displaySkipReason is not null)
+        {
+            ShowResult(AcceptanceStatus.Skipped, displaySkipReason);
+            DisposeDisplayScenario();
+            return;
+        }
+        if (!CheckPrerequisites())
+        {
+            DisposeDisplayScenario();
+            return;
+        }
+        if (!AcceptanceStepTimeout.TryRead(
+                Environment.GetEnvironmentVariable("DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES"), out stepTimeout))
+        {
+            ShowResult(AcceptanceStatus.Failed,
+                "DESKTOP_PUPPY_ACCEPTANCE_STEP_TIMEOUT_MINUTES must be a whole number from 1 to 120.");
+            return;
+        }
+
+        BeginButton.IsEnabled = false;
+        LockScenario.IsEnabled = false;
+        PowerScenario.IsEnabled = false;
+        DisplayScenarioButton.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
+        CancelButton.IsEnabled = true;
+        ResultState.Text = "Starting isolated mixed-DPI display run";
+        ResultDetail.Text = "Preparing a private database and one isolated Desktop Puppy process after all opt-in, session, and monitor gates.";
+        startCancellation = new CancellationTokenSource();
+        DisplayAcceptanceRun? candidate = null;
+        try
+        {
+            var scenarioForRun = displayScenario;
+            pendingDisplayStartup = Task.Run(() => DisplayAcceptanceRun.StartAsync(
+                Environment.GetEnvironmentVariable("DESKTOP_PUPPY_EXE")!,
+                scenarioForRun,
+                startCancellation.Token,
+                GetDisplayPrerequisiteSkipReason));
+            candidate = await pendingDisplayStartup;
+            if (closing || startCancellation.IsCancellationRequested)
+            {
+                await candidate.DisposeAsync();
+                candidate = null;
+                return;
+            }
+
+            displayRun = candidate;
+            candidate = null;
+            displayPetHwnd = displayRun.PetHwnd;
+            displayMonitors = scenarioForRun.GetMonitors();
+            displayObservations.Clear();
+            scenarioCancellation = new CancellationTokenSource();
+            ResultState.Text = "Waiting for operator-confirmed display move";
+            ResultDetail.Text = "The same isolated pet HWND is ready. Capture the first display after your manual move.";
+            Instructions.Text = $"A single live pet HWND was discovered through UI Automation for the isolated app PID. Manually drag that same pet near a work-area edge on {displayMonitors[0].Alias}, let placement settle, then click the button to confirm and capture its DPI/physical geometry. The second confirmation is for {displayMonitors[1].Alias}. The app remains isolated and no input or placement is injected by the utility.";
+            CaptureDisplayButton.Content = $"I moved the same pet to {displayMonitors[0].Alias} — capture";
+            CaptureDisplayButton.IsEnabled = true;
+        }
+        catch (AcceptanceSkippedException ex)
+        {
+            ShowResult(AcceptanceStatus.Skipped, ex.Message);
+            DisposeDisplayScenario();
+        }
+        catch (OperationCanceledException)
+        {
+            ShowResult(AcceptanceStatus.Incomplete, "Display run startup cancelled; no acceptance verdict was produced.");
+            await EndDisplayRunSafelyAsync();
+        }
+        catch (Exception)
+        {
+            ShowResult(AcceptanceStatus.Failed,
+                "The isolated display run or UI Automation pet-window discovery failed; no hardware identifiers or unrelated titles were reported.");
+            await EndDisplayRunSafelyAsync();
+            DisposeDisplayScenario();
+        }
+        finally
+        {
+            if (candidate is not null)
+            {
+                try { await candidate.DisposeAsync(); }
+                catch (Exception) { ShowResult(AcceptanceStatus.Failed, "An owned display-run child could not be fully cleaned up."); }
+            }
+            startCancellation?.Dispose();
+            startCancellation = null;
+            pendingDisplayStartup = null;
+        }
+    }
+
+    private async void CaptureDisplayObservation(object sender, RoutedEventArgs e)
+    {
+        if (displayRun is null || displayScenario is null || displayMonitors is null ||
+            displayObservations.Count >= 2 || scenarioCancellation is null)
+            return;
+
+        CaptureDisplayButton.IsEnabled = false;
+        CancelButton.IsEnabled = true;
+        pendingScenario = CaptureDisplayObservationAsync();
+        try { await pendingScenario; }
+        finally { pendingScenario = null; }
+    }
+
+    private async Task CaptureDisplayObservationAsync()
+    {
+        var currentRun = displayRun;
+        var currentScenario = displayScenario;
+        var availableMonitors = displayMonitors;
+        var cancellationToken = scenarioCancellation?.Token ?? CancellationToken.None;
+        if (currentRun is null || currentScenario is null || availableMonitors is null) return;
+
+        try
+        {
+            var target = availableMonitors[displayObservations.Count];
+            ResultState.Text = $"Waiting for {target.Alias} placement to settle";
+            ResultDetail.Text = "The utility is sampling only the same HWND's UIA identity and read-only Native geometry.";
+            var observation = await currentScenario.ObserveWhenSettledAsync(
+                target.Alias,
+                displayPetHwnd,
+                currentRun.ProductProcessId,
+                () => displayRun?.IsProductRunning == true,
+                cancellationToken);
+            if (!string.Equals(observation.MonitorAlias, target.Alias, StringComparison.Ordinal))
+            {
+                await EndDisplayRunAsync();
+                ShowResult(AcceptanceStatus.Failed,
+                    $"The same pet HWND was confirmed for {target.Alias}, but native monitor lookup measured {observation.MonitorAlias}.");
+                return;
+            }
+
+            displayObservations.Add(observation);
+            if (displayObservations.Count == 1)
+            {
+                ResultState.Text = "Observation 1 of 2 recorded";
+                ResultDetail.Text = FormatObservation(observation);
+                Instructions.Text = $"First manual confirmation recorded for {target.Alias}. Now manually drag the same pet window near a work-area edge on {availableMonitors[1].Alias}, allow production placement reconciliation to settle, and confirm the second observation.";
+                CaptureDisplayButton.Content = $"I moved the same pet to {availableMonitors[1].Alias} — capture";
+                CaptureDisplayButton.IsEnabled = true;
+                return;
+            }
+
+            var result = DisplayAcceptanceScenario.Validate(availableMonitors, displayObservations, currentRun.ProductProcessId);
+            await EndDisplayRunAsync();
+            ShowResult(result.Status, result.Summary);
+        }
+        catch (OperationCanceledException)
+        {
+            ShowResult(AcceptanceStatus.Incomplete, "Display observation cancelled; no acceptance verdict was produced.");
+            await EndDisplayRunSafelyAsync();
+        }
+        catch (Exception)
+        {
+            ShowResult(AcceptanceStatus.Failed,
+                "Read-only UIA/Native display observation failed; no monitor identifiers, HWND values, or unrelated titles were reported.");
+            await EndDisplayRunSafelyAsync();
+        }
+    }
+
+    private static string FormatObservation(DisplayAcceptanceObservation observation) =>
+        $"{observation.TargetAlias}: {observation.Dpi} DPI; physical bounds " +
+        $"[{observation.Bounds.Left},{observation.Bounds.Top},{observation.Bounds.Right},{observation.Bounds.Bottom}]; " +
+        $"work area [{observation.WorkArea.Left},{observation.WorkArea.Top},{observation.WorkArea.Right},{observation.WorkArea.Bottom}].";
 
     private async Task ObserveLockScenarioAsync(Task<AcceptanceResult> scenarioTask)
     {
@@ -251,9 +477,14 @@ public partial class WindowsAcceptanceWindow : Window
         scenarioCancellation?.Cancel();
         CompleteButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
         ResultState.Text = AcceptanceStatus.Incomplete.ToString();
         ResultDetail.Text = "Operator cancelled; no acceptance verdict was produced.";
-        if (pendingScenario is null) await EndRunSafelyAsync();
+        if (pendingScenario is null)
+        {
+            await EndRunSafelyAsync();
+            await EndDisplayRunSafelyAsync();
+        }
     }
 
     private void ShowResult(AcceptanceStatus status, string detail)
@@ -261,11 +492,13 @@ public partial class WindowsAcceptanceWindow : Window
         if (closing) return;
         ResultState.Text = status.ToString();
         ResultDetail.Text = detail;
-        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped && scenario is "lock" or "power";
+        BeginButton.IsEnabled = status != AcceptanceStatus.Skipped && scenario is "lock" or "power" or "display";
         CompleteButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
+        CaptureDisplayButton.IsEnabled = false;
         LockScenario.IsEnabled = status != AcceptanceStatus.Skipped;
         PowerScenario.IsEnabled = status != AcceptanceStatus.Skipped;
+        DisplayScenarioButton.IsEnabled = true;
     }
 
     private async Task EndRunAsync()
@@ -275,6 +508,43 @@ public partial class WindowsAcceptanceWindow : Window
         if (ending is null) return;
         ending.EventsChanged -= OnEventsChanged;
         await ending.DisposeAsync();
+    }
+
+    private async Task EndDisplayRunAsync()
+    {
+        var ending = displayRun;
+        displayRun = null;
+        if (ending is not null)
+        {
+            try { await ending.DisposeAsync(); }
+            finally { displayScenario = null; }
+        }
+        else DisposeDisplayScenario();
+        displayMonitors = null;
+        displayPetHwnd = IntPtr.Zero;
+        displayObservations.Clear();
+        scenarioCancellation?.Dispose();
+        scenarioCancellation = null;
+    }
+
+    private async Task EndDisplayRunSafelyAsync()
+    {
+        try { await EndDisplayRunAsync(); }
+        catch (Exception)
+        {
+            ShowResult(AcceptanceStatus.Failed,
+                "The owned display app could not be fully stopped; its private run directory was retained for safety.");
+        }
+    }
+
+    private void DisposeDisplayScenario()
+    {
+        displayScenario?.Dispose();
+        displayScenario = null;
+        displayMonitors = null;
+        displayPetHwnd = IntPtr.Zero;
+        displayObservations.Clear();
+        CaptureDisplayButton.IsEnabled = false;
     }
 
     private async Task EndRunSafelyAsync()
@@ -299,12 +569,19 @@ public partial class WindowsAcceptanceWindow : Window
                 try { await (await pendingStartup).DisposeAsync(); }
                 catch (Exception) { /* Startup failure or cleanup is reported without sensitive details. */ }
             }
+            if (pendingDisplayStartup is not null)
+            {
+                try { await (await pendingDisplayStartup).DisposeAsync(); }
+                catch (Exception) { /* Startup failure or cleanup is reported without sensitive details. */ }
+            }
             if (pendingScenario is not null)
             {
                 try { await pendingScenario; }
                 catch (Exception) { /* Scenario cancellation is incomplete, not a passing verdict. */ }
             }
             await EndRunSafelyAsync();
+            await EndDisplayRunSafelyAsync();
+            DisposeDisplayScenario();
         }
         finally
         {
