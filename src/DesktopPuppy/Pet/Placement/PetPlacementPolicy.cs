@@ -1,5 +1,6 @@
 namespace DesktopPuppy.Pet.Placement;
 
+/// <summary>Describes a monitor work area in physical pixels.</summary>
 public readonly record struct MonitorWorkArea(
     string Id,
     double Left,
@@ -8,6 +9,7 @@ public readonly record struct MonitorWorkArea(
     double Height,
     bool IsPrimary);
 
+/// <summary>Describes a window position in physical pixels.</summary>
 public readonly record struct PetPosition(double Left, double Top);
 
 public static class PetPlacementPolicy
@@ -36,6 +38,7 @@ public static class PetPlacementPolicy
         return monitors.FirstOrDefault(monitor => monitor.IsPrimary);
     }
 
+    /// <summary>Clamps physical-pixel window geometry while keeping the requested physical-pixel edge visible.</summary>
     public static PetPosition Clamp(
         PetPosition requested,
         double petWidth,

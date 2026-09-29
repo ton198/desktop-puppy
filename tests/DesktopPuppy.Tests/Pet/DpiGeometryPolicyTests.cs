@@ -25,6 +25,26 @@ public sealed class DpiGeometryPolicyTests
     }
 
     [Theory]
+    [InlineData(100.0, 96, 100)]
+    [InlineData(100.01, 96, 101)]
+    [InlineData(100.0, 144, 150)]
+    [InlineData(100.01, 144, 151)]
+    public void Dip_extents_convert_to_ceiling_physical_pixels(double dips, uint dpi, int expected)
+    {
+        Assert.Equal(expected, DpiGeometryPolicy.ToPhysicalExtent(dips, dpi));
+    }
+
+    [Theory]
+    [InlineData(10.5, 11)]
+    [InlineData(-10.5, -11)]
+    [InlineData(10.49, 10)]
+    [InlineData(-10.49, -10)]
+    public void Physical_coordinates_round_away_from_zero(double coordinate, int expected)
+    {
+        Assert.Equal(expected, DpiGeometryPolicy.RoundPhysicalCoordinate(coordinate));
+    }
+
+    [Theory]
     [InlineData(1.25)]
     [InlineData(1.5)]
     [InlineData(2.0)]
@@ -40,48 +60,45 @@ public sealed class DpiGeometryPolicyTests
     [Fact]
     public void Visible_edge_margin_is_twenty_physical_pixels_at_one_hundred_fifty_percent_scale()
     {
-        const double scale = 1.5;
-        var visibleMarginDips = DpiGeometryPolicy.ToDips(20, scale);
-        var workArea = new MonitorWorkArea("scaled", 0, 0, 1280, 720, true);
-        const double petWidth = 260;
-        const double petHeight = 210;
+        const uint dpi = 144;
+        const double scale = dpi / 96.0;
+        var workArea = new MonitorWorkArea("scaled", 0, 0, 1920, 1080, true);
+        var petWidth = DpiGeometryPolicy.ToPhysicalExtent(260, dpi);
+        var petHeight = DpiGeometryPolicy.ToPhysicalExtent(210, dpi);
+        const double minimumVisiblePixels = 20;
         var clamped = new[]
         {
-            PetPlacementPolicy.Clamp(new PetPosition(-1000, 100), petWidth, petHeight, workArea, visibleMarginDips),
-            PetPlacementPolicy.Clamp(new PetPosition(2000, 100), petWidth, petHeight, workArea, visibleMarginDips),
-            PetPlacementPolicy.Clamp(new PetPosition(100, -1000), petWidth, petHeight, workArea, visibleMarginDips),
-            PetPlacementPolicy.Clamp(new PetPosition(100, 2000), petWidth, petHeight, workArea, visibleMarginDips)
+            PetPlacementPolicy.Clamp(new PetPosition(-1000, 100), petWidth, petHeight, workArea, minimumVisiblePixels),
+            PetPlacementPolicy.Clamp(new PetPosition(2000, 100), petWidth, petHeight, workArea, minimumVisiblePixels),
+            PetPlacementPolicy.Clamp(new PetPosition(100, -1000), petWidth, petHeight, workArea, minimumVisiblePixels),
+            PetPlacementPolicy.Clamp(new PetPosition(100, 2000), petWidth, petHeight, workArea, minimumVisiblePixels)
         };
 
-        Assert.InRange((clamped[0].Left + petWidth - workArea.Left) * scale, 20 - 1e-9, 20 + 1e-9);
-        Assert.InRange((workArea.Left + workArea.Width - clamped[1].Left) * scale, 20 - 1e-9, 20 + 1e-9);
-        Assert.InRange((clamped[2].Top + petHeight - workArea.Top) * scale, 20 - 1e-9, 20 + 1e-9);
-        Assert.InRange((workArea.Top + workArea.Height - clamped[3].Top) * scale, 20 - 1e-9, 20 + 1e-9);
+        Assert.Equal(1.5, scale);
+        Assert.Equal(20, clamped[0].Left + petWidth - workArea.Left);
+        Assert.Equal(20, workArea.Left + workArea.Width - clamped[1].Left);
+        Assert.Equal(20, clamped[2].Top + petHeight - workArea.Top);
+        Assert.Equal(20, workArea.Top + workArea.Height - clamped[3].Top);
     }
 
     [Fact]
     public void Same_physical_visible_margin_is_independent_of_monitor_scale()
     {
-        var visibleAtOneX = ClampLeftEdgeAndMeasurePhysicalVisibility(1.0);
-        var visibleAtOneAndHalfX = ClampLeftEdgeAndMeasurePhysicalVisibility(1.5);
+        var visibleAtOneX = ClampLeftEdgeAndMeasurePhysicalVisibility(96);
+        var visibleAtOneAndHalfX = ClampLeftEdgeAndMeasurePhysicalVisibility(144);
 
-        Assert.InRange(visibleAtOneX, 20 - 1e-9, 20 + 1e-9);
-        Assert.InRange(visibleAtOneAndHalfX, 20 - 1e-9, 20 + 1e-9);
+        Assert.Equal(20, visibleAtOneX);
+        Assert.Equal(20, visibleAtOneAndHalfX);
     }
 
-    private static double ClampLeftEdgeAndMeasurePhysicalVisibility(double scale)
+    private static double ClampLeftEdgeAndMeasurePhysicalVisibility(uint dpi)
     {
-        var area = new MonitorWorkArea(
-            "monitor", 0, 0,
-            DpiGeometryPolicy.ToDips(1920, scale),
-            DpiGeometryPolicy.ToDips(1080, scale),
-            true);
-        var petWidth = DpiGeometryPolicy.ToDips(260, scale);
-        var petHeight = DpiGeometryPolicy.ToDips(210, scale);
-        var minimumVisible = DpiGeometryPolicy.ToDips(20, scale);
+        var workArea = new MonitorWorkArea("monitor", 0, 0, 1920, 1080, true);
+        var petWidth = DpiGeometryPolicy.ToPhysicalExtent(260, dpi);
+        var petHeight = DpiGeometryPolicy.ToPhysicalExtent(210, dpi);
         var position = PetPlacementPolicy.Clamp(
-            new PetPosition(-10000, 100), petWidth, petHeight, area, minimumVisible);
+            new PetPosition(-10000, 100), petWidth, petHeight, workArea, minimumVisiblePixels: 20);
 
-        return (position.Left + petWidth - area.Left) * scale;
+        return position.Left + petWidth - workArea.Left;
     }
 }

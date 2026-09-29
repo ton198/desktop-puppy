@@ -19,8 +19,9 @@ public sealed class PetPlacementPolicyTests
         Assert.Equal(-2160, position.Left);
         Assert.Equal(-390, position.Top);
     }
+
     [Fact]
-    public void Clamp_keeps_at_least_twenty_pixels_visible_on_each_edge()
+    public void Clamp_keeps_at_least_twenty_physical_pixels_visible_on_each_edge()
     {
         var position = PetPlacementPolicy.Clamp(
             new PetPosition(-500, 1200),
@@ -30,6 +31,22 @@ public sealed class PetPlacementPolicyTests
 
         Assert.Equal(-240, position.Left);
         Assert.Equal(1060, position.Top);
+    }
+
+    [Fact]
+    public void Clamp_interprets_window_and_work_area_geometry_as_physical_pixels()
+    {
+        var workArea = new MonitorWorkArea("left", -1920, -200, 1920, 1080, false);
+
+        var position = PetPlacementPolicy.Clamp(
+            new PetPosition(-5000, -5000),
+            petWidth: 300,
+            petHeight: 200,
+            workArea,
+            minimumVisiblePixels: 20);
+
+        Assert.Equal(-2200, position.Left);
+        Assert.Equal(-380, position.Top);
     }
 
     [Fact]
