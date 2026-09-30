@@ -1,7 +1,7 @@
 # WPF System Tray Integration Design
 
 **Date:** 2026-09-29
-**Status:** User-approved approach; awaiting written-spec review
+**Status:** Task 1 library gate: NO-GO; do not add a tray dependency until the documented concerns are resolved or independently validated
 **Scope:** Add a WPF-native tray entry point for the existing Desktop Puppy process
 
 ## 1. Goal
@@ -25,6 +25,14 @@ Before adding a package reference, verify from authoritative package/repository 
 If a material compatibility, maintenance, or license issue is found, stop and report it rather than silently changing to another tray implementation.
 
 The initial icon is a temporary generic, original vector mark embedded in the project. It must not use Snoopy or other unlicensed character art. The later art-creation milestone may replace it.
+
+### Task 1 library verification — NO-GO (2026-09-29)
+
+- **Package and license:** The official exact NuGet search returned exact ID `Hardcodet.NotifyIcon.Wpf`; latest stable is [2.0.1](https://www.nuget.org/packages/Hardcodet.NotifyIcon.Wpf/2.0.1). The [2.0.1 nuspec](https://api.nuget.org/v3-flatcontainer/hardcodet.notifyicon.wpf/2.0.1/hardcodet.notifyicon.wpf.nuspec) declares `MIT`, matching the upstream [LICENSE](https://github.com/hardcodet/wpf-notifyicon/blob/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b/LICENSE) and [NuGet MIT text](https://licenses.nuget.org/MIT).
+- **Framework:** The nuspec declares `net8.0-windows7.0` (and older targets). Microsoft framework [compatibility guidance](https://learn.microsoft.com/en-us/dotnet/standard/frameworks#framework-compatibility) identifies `net10.0-windows` as subsequent to `net8.0-windows`; the current WPF target need not move. This is TFM compatibility evidence, not an application build/test with the package.
+- **API and disposal:** Upstream [`TaskbarIcon` source](https://github.com/hardcodet/wpf-notifyicon/blob/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b/src/NotifyIconWpf/TaskbarIcon.cs) defines `Hardcodet.Wpf.TaskbarNotification.TaskbarIcon` as a `FrameworkElement` implementing `IDisposable`. Its [declarations](https://github.com/hardcodet/wpf-notifyicon/blob/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b/src/NotifyIconWpf/TaskbarIcon.Declarations.cs) expose `IconSource` as an `ImageSource` dependency property; the menu is WPF `FrameworkElement.ContextMenu` (`System.Windows.Controls.ContextMenu`; [Microsoft API](https://learn.microsoft.com/en-us/dotnet/api/system.windows.frameworkelement.contextmenu?view=windowsdesktop-10.0)). The constructor subscribes to `Application.Exit`; `Dispose()` checks `IsDisposed`, unregisters that handler, stops timers, disposes the message sink, and removes the Shell icon. Create, update, and dispose on the WPF dispatcher; avoid cross-thread disposal. [Issue #122](https://github.com/hardcodet/wpf-notifyicon/issues/122) reports sporadic cross-thread lock/dispatcher deadlock and `TaskCanceledException` during shutdown. The documented lock-inversion reproduction is avoided by dispatcher-only ownership, but the shutdown exception remains incompletely explained.
+- **Explorer restart:** Automatic. [`WindowMessageSink`](https://github.com/hardcodet/wpf-notifyicon/blob/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b/src/NotifyIconWpf/Interop/WindowMessageSink.cs) registers the Windows `TaskbarCreated` message; [`TaskbarIcon`](https://github.com/hardcodet/wpf-notifyicon/blob/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b/src/NotifyIconWpf/TaskbarIcon.cs) removes and recreates its icon on receipt.
+- **Material concern and decision:** Upstream [issue #132](https://github.com/hardcodet/wpf-notifyicon/issues/132) remains open and untriaged. It reports the WPF context menu appearing at random screen locations on a Surface tablet, directly affecting the primary command surface in this design. The latest stable [release](https://github.com/hardcodet/wpf-notifyicon/releases/tag/2.0.1) and [source commit](https://github.com/hardcodet/wpf-notifyicon/commit/0a9d1a92914db8fb6b1cca1f073469644cd9bf3b) are from October 2024; the April 2026 report has no comments or maintainer response. This does not prove abandonment or broad impact, but is material unresolved reliability/maintenance risk for this use. **NO-GO pending upstream resolution or independent validation of this exact menu behavior.** Do not add the package or select a substitute. See [the Task 1 report](../../../.superpowers/sdd/2026-09-29-wpf-tray-icon/task-1-report.md) for full evidence and commands.
 
 ## 3. User-visible behavior
 
