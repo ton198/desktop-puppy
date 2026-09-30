@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
+using WpfDpiChangedEventArgs = System.Windows.DpiChangedEventArgs;
+using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
 using System.Windows.Threading;
 using DesktopPuppy.Native;
 using DesktopPuppy.Pet.Interaction;
@@ -120,7 +122,7 @@ public partial class PetWindow : Window
 
     private void PetWindow_OnLocationChanged(object? sender, EventArgs e) => QueuePlacementReconcile();
 
-    private void PetWindow_OnDpiChanged(object sender, DpiChangedEventArgs e) => QueuePlacementReconcile();
+    private void PetWindow_OnDpiChanged(object sender, WpfDpiChangedEventArgs e) => QueuePlacementReconcile();
 
     private void MonitorDisplayProvider_OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
@@ -197,7 +199,7 @@ public partial class PetWindow : Window
         }
     }
 
-    private void PetWindow_OnMouseMove(object sender, MouseEventArgs e)
+    private void PetWindow_OnMouseMove(object sender, WpfMouseEventArgs e)
     {
         if (e.OriginalSource is Button)
         {
