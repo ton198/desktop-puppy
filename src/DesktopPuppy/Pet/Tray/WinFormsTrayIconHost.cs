@@ -11,6 +11,8 @@ namespace DesktopPuppy.Pet.Tray;
 public sealed class WinFormsTrayIconHost : ITrayIconHost
 {
     private const string IconResourceName = "DesktopPuppy.Pet.Tray.Assets.DesktopPuppyTray.ico";
+    private const string MissingApplicationMessage = "A current WPF Application is required to use the tray icon host.";
+
     private ContextMenuStrip? _menu;
     private FormsNotifyIcon? _notifyIcon;
     private Icon? _icon;
@@ -20,7 +22,7 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
 
     public void Start()
     {
-        Application.Current.Dispatcher.VerifyAccess();
+        VerifyDispatcherAccess();
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_notifyIcon is not null) return;
 
@@ -30,13 +32,11 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
                 ?? throw new InvalidOperationException($"Embedded tray icon resource '{IconResourceName}' was not found.");
             _icon = new Icon(stream);
             _menu = TrayContextMenuFactory.Create(OnCommandRequested);
-            _notifyIcon = new FormsNotifyIcon
-            {
-                Icon = _icon,
-                Text = "Desktop Puppy",
-                ContextMenuStrip = _menu,
-                Visible = true
-            };
+            _notifyIcon = new FormsNotifyIcon();
+            _notifyIcon.Icon = _icon;
+            _notifyIcon.Text = "Desktop Puppy";
+            _notifyIcon.ContextMenuStrip = _menu;
+            _notifyIcon.Visible = true;
         }
         catch
         {
@@ -47,23 +47,41 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
 
     public void Dispose()
     {
+        VerifyDispatcherAccess();
         if (_disposed) return;
-        Application.Current.Dispatcher.VerifyAccess();
         _disposed = true;
         CommandRequested = null;
 
-        if (_menu is not null) TrayContextMenuFactory.DetachHandlers(_menu);
-        if (_notifyIcon is not null)
-        {
-            _notifyIcon.Visible = false;
-            _notifyIcon.ContextMenuStrip = null;
-            _notifyIcon.Dispose();
-            _notifyIcon = null;
-        }
-        _menu?.Dispose();
+        var menu = _menu;
+        var notifyIcon = _notifyIcon;
+        var icon = _icon;
         _menu = null;
-        _icon?.Dispose();
+        _notifyIcon = null;
         _icon = null;
+
+        TrayResourceCleanup.Run(
+            () =>
+            {
+                if (menu is not null) TrayContextMenuFactory.DetachHandlers(menu);
+            },
+            () =>
+            {
+                if (notifyIcon is not null) notifyIcon.Visible = false;
+            },
+            () =>
+            {
+                if (notifyIcon is not null) notifyIcon.ContextMenuStrip = null;
+            },
+            () => notifyIcon?.Dispose(),
+            () => menu?.Dispose(),
+            () => icon?.Dispose());
+    }
+
+    private static void VerifyDispatcherAccess()
+    {
+        var application = Application.Current
+            ?? throw new InvalidOperationException(MissingApplicationMessage);
+        application.Dispatcher.VerifyAccess();
     }
 
     private void OnCommandRequested(TrayIconCommand command) =>

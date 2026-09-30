@@ -86,3 +86,51 @@ Ran the brief’s exact focused tests after the build:
 Result: **exit 0; 2 passed, 0 failed, 0 skipped**.
 
 Actual Shell icon presence/menu positioning and Explorer behavior remain unverified and require manual acceptance. Neither a build nor `NotifyIcon.Visible` proves Shell visibility.
+
+## Follow-up fix — resilient host cleanup
+
+**Fix branch commit before this change:** `9fc0c14 docs: harden tray resource cleanup plan` (feature baseline: `0157228`).
+
+### TDD RED
+
+Added `Cleanup_continues_after_one_action_throws` to `tests/DesktopPuppy.Tests/Pet/Tray/TrayResourceCleanupTests.cs` before creating the helper or modifying the host, then ran the updated brief’s restore and focused filter. Restore completed (with the existing NU1801 missing-local-source warnings). The focused test build stopped at the expected compile-time missing-helper reference; the intended test failure was:
+
+```text
+tests/DesktopPuppy.Tests/Pet/Tray/TrayResourceCleanupTests.cs(16,46): error CS0103: 当前上下文中不存在名称“TrayResourceCleanup”
+```
+
+The two existing menu tests also referenced the absent factory during the initial attempt? **No** — the factory already existed from the feature commit. The RED was solely the new `TrayResourceCleanup` type missing.
+
+### GREEN and final verification
+
+After adding the helper and updating `WinFormsTrayIconHost`, ran the updated brief’s focused filter:
+
+```powershell
+& 'C:\Program Files\dotnet\dotnet.exe' test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore --filter 'FullyQualifiedName~TrayContextMenuFactoryTests|FullyQualifiedName~TrayResourceCleanupTests' --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false
+```
+
+Result: **exit 0; 3 passed, 0 failed, 0 skipped**. This includes menu labels/order, command mapping, and proof that a throwing cleanup action does not prevent the following action. These tests create no `NotifyIcon` and perform no real Shell or desktop interaction.
+
+Ran the updated brief’s Release app build:
+
+```powershell
+& 'C:\Program Files\dotnet\dotnet.exe' build src/DesktopPuppy/DesktopPuppy.csproj --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false -p:NuGetAudit=false
+```
+
+Result: **exit 0; 0 errors; 26 warnings**. These are the exact distinct diagnostic lines observed (the generated WPF temporary-project identifier is `DesktopPuppy_if4dy4f4_wpftmp.csproj`):
+
+```text
+C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\DesktopPuppy.csproj : warning NU1801: 本地源“C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\”不存在。
+C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\DesktopPuppy_if4dy4f4_wpftmp.csproj : warning NU1801: 本地源“C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\”不存在。
+CSC : warning WFO0003: 从 C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\app.manifest 中删除高 DPI 设置，并通过 Application.SetHighDpiMode API 或“ApplicationHighDpiMode”项目属性进行配置 (https://aka.ms/winforms-warnings/wfo0003) [C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\DesktopPuppy.csproj]
+CSC : warning WFO0003: 从 C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\app.manifest 中删除高 DPI 设置，并通过 Application.SetHighDpiMode API 或“ApplicationHighDpiMode”项目属性进行配置 (https://aka.ms/winforms-warnings/wfo0003) [C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy\src\DesktopPuppy\DesktopPuppy_if4dy4f4_wpftmp.csproj]
+```
+
+The build was followed by the same focused test command; result: **exit 0; 3 passed, 0 failed, 0 skipped**.
+
+### Changes and limitations
+
+- `Start()` assigns `_notifyIcon` immediately after construction and before setting component properties, so a later property failure is covered by owned-resource cleanup.
+- `Dispose()` clears its fields before invoking six ordered, independent best-effort actions. The helper continues after an individual failure and writes only the fixed diagnostic `Tray resource cleanup step failed.`; it does not expose exception details.
+- Both `Start()` and `Dispose()` explicitly throw `InvalidOperationException("A current WPF Application is required to use the tray icon host.")` when no current WPF application exists, before dispatcher access or host mutation.
+- No `App` integration changes were made. Actual Explorer/Shell icon visibility and menu interaction remain unverified and require manual acceptance; no test or `NotifyIcon.Visible` value is claimed as evidence of Shell visibility.
