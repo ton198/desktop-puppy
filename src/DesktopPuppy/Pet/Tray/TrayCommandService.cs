@@ -34,7 +34,7 @@ public sealed class TrayCommandService : IDisposable
             _host.CommandRequested -= OnCommandRequested;
             try { DisposeHostOnce(); }
             catch { /* Host cleanup must not make tray startup fatal. */ }
-            Console.Error.WriteLine(StartFailureDiagnostic);
+            TrayDiagnostics.WriteFixed(StartFailureDiagnostic);
         }
     }
 

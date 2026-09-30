@@ -4,8 +4,12 @@ internal static class TrayResourceCleanup
 {
     private const string CleanupFailureDiagnostic = "Tray resource cleanup step failed.";
 
-    internal static void Run(params Action[] cleanupSteps)
+    internal static void Run(params Action[] cleanupSteps) =>
+        Run(TrayDiagnostics.WriteFixed, cleanupSteps);
+
+    internal static void Run(Action<string> diagnosticSink, params Action[] cleanupSteps)
     {
+        ArgumentNullException.ThrowIfNull(diagnosticSink);
         ArgumentNullException.ThrowIfNull(cleanupSteps);
         foreach (var cleanupStep in cleanupSteps)
         {
@@ -15,7 +19,7 @@ internal static class TrayResourceCleanup
             }
             catch
             {
-                Console.Error.WriteLine(CleanupFailureDiagnostic);
+                TrayDiagnostics.WriteSafely(diagnosticSink, CleanupFailureDiagnostic);
             }
         }
     }

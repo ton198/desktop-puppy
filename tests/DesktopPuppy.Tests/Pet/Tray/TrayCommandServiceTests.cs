@@ -80,15 +80,26 @@ public sealed class TrayCommandServiceTests
         Assert.Equal(1, host.DisposeCount);
     }
 
-    // Purpose: Keep single-instance recovery independent of tray setup.
-    // Coverage: Start fails, then ActivateExistingInstance is called twice.
-    // Target effect: ShowPet is called twice against the same fake action/window identity; host start remains one attempt.
+    // Purpose: Keep second-instance activation independent of tray setup.
+    // Coverage: Host startup fails, then activation is requested twice.
+    // Target effect: Both requests route to the injected actions, while the host has only one start attempt.
     [Fact]
-    public void Second_instance_activation_restores_existing_pet_even_when_tray_unavailable()
+    public void Second_instance_activation_routes_twice_when_tray_start_fails()
     {
-        var host = new FakeTrayIconHost { StartException = new InvalidOperationException("test") }; var actions = new FakeTrayApplicationActions();
-        using var service = new TrayCommandService(host, actions); service.Start(); service.ActivateExistingInstance(); service.ActivateExistingInstance();
-        Assert.Equal(2, actions.ShowCount); Assert.Equal(1, host.StartCount); Assert.Same(actions, actions.LastShowTarget);
+        var host = new FakeTrayIconHost { StartException = new InvalidOperationException("test") };
+        var actions = new FakeTrayApplicationActions();
+        using var service = new TrayCommandService(host, actions);
+
+        service.Start();
+        service.ActivateExistingInstance();
+        service.ActivateExistingInstance();
+
+        Assert.Equal(2, actions.ShowCount);
+        Assert.Equal(0, actions.HideCount);
+        Assert.Equal(0, actions.StatisticsCount);
+        Assert.Equal(0, actions.ExitCount);
+        Assert.False(service.IsAvailable);
+        Assert.Equal(1, host.StartCount);
     }
 
     // Purpose: Remove callbacks/resources safely at shutdown.
@@ -128,8 +139,7 @@ public sealed class TrayCommandServiceTests
         public int ExitCount { get; private set; }
         public int TotalCalls => ShowCount + HideCount + StatisticsCount + ExitCount;
         public bool PetVisible { get; set; } = true;
-        public object? LastShowTarget { get; private set; }
-        public void ShowPet() { ShowCount++; PetVisible = true; LastShowTarget = this; }
+        public void ShowPet() { ShowCount++; PetVisible = true; }
         public void HidePet() { HideCount++; PetVisible = false; }
         public void OpenStatistics() => StatisticsCount++;
         public void ExitApplication() => ExitCount++;

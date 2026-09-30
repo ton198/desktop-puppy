@@ -67,9 +67,9 @@ public partial class App : WpfApplication
         {
             _trayCommandService?.Dispose();
         }
-        catch (Exception exception)
+        catch
         {
-            Debug.WriteLine($"Tray service cleanup failed: {exception}");
+            TrayDiagnostics.WriteFixed("Tray service cleanup failed.");
         }
         finally
         {
