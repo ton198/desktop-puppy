@@ -39,7 +39,10 @@
 - `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs` — create the approved menu labels/order and map menu clicks to command identities without registering an icon.
 - `src/DesktopPuppy/Properties/AssemblyInfo.cs` — expose the internal menu factory only to `DesktopPuppy.Tests` for deterministic STA tests.
 - `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico` — original generic multi-resolution tray mark; no Snoopy or copied character art.
-- `src/DesktopPuppy/App.xaml.cs` — own/start/dispose the tray service, implement actions, reuse statistics activation, and route existing single-instance activation.
+- `src/DesktopPuppy/App.xaml.cs` — compose and own the tray service/actions, reuse statistics activation, and route existing single-instance activation.
+- `src/DesktopPuppy/Pet/Tray/ITrayPetWindow.cs` — framework-independent visibility/window-action contract.
+- `src/DesktopPuppy/Pet/Tray/TrayApplicationActions.cs` — testable show/hide/statistics/exit behavior using the pet-window contract.
+- `tests/DesktopPuppy.Tests/Pet/Tray/TrayApplicationActionsTests.cs` — fake-window tests for app-action semantics.
 - `tests/DesktopPuppy.Tests/Pet/Tray/TrayCommandServiceTests.cs` — fake host/action tests for service lifecycle and routing.
 - `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs` — optional STA-only tests for menu structure/click mapping; no `NotifyIcon`, Shell registration, or visible UI.
 - `docs/implementation-status.md` — record exact build/test results and TRAY-01–04 manual status/evidence.
@@ -187,24 +190,60 @@ Expected: restore succeeds with available framework packs; the test build fails 
 ```
 
 Expected: app build succeeds; all three focused tests pass without Shell interaction. Record warnings exactly; do not claim the Shell icon is visible from build success or `NotifyIcon.Visible`. Run `git diff --check`, then commit only the two project settings, friend declaration, host, factory, cleanup helper, icon, and the two test files as `feat: add WinForms tray icon host`.
-## Task 4: Connect the service to WPF startup, statistics, and shutdown
+## Task 4: Connect testable actions and the service to WPF startup/shutdown
 
 **Files:**
+- Create: `src/DesktopPuppy/Pet/Tray/ITrayPetWindow.cs`
+- Create: `src/DesktopPuppy/Pet/Tray/TrayApplicationActions.cs`
+- Create: `tests/DesktopPuppy.Tests/Pet/Tray/TrayApplicationActionsTests.cs`
+- Modify: `src/DesktopPuppy/Pet/PetWindow.xaml.cs` — implement the framework-independent pet-window seam.
 - Modify: `src/DesktopPuppy/App.xaml.cs`
-- Modify: `tests/DesktopPuppy.Tests/Pet/Tray/TrayCommandServiceTests.cs` only if a service contract regression is found.
 
 **Interfaces:**
-- Consumes: `TrayCommandService`, `WinFormsTrayIconHost`, and `ITrayApplicationActions`.
-- Produces: `App` implements `ITrayApplicationActions` explicitly and owns one optional tray service from successful single-instance acquisition through `OnExit`.
 
-- [ ] **Step 1: Add one optional tray-service field and create the host only for the single-instance owner.** Do not touch the existing second-instance early shutdown path. Create the pet window and set `MainWindow`; initialize the service after the window/action targets exist and before or immediately around showing the pet, then show the pet regardless of host initialization success. A failed service start must not close/hide the pet.
-- [ ] **Step 2: Implement the four WPF actions on the Dispatcher.** `ShowPet` checks `_petWindow`, calls `Show()` only if hidden, sets `WindowState.Normal` if minimized, then calls `Activate()`. `HidePet` calls only `_petWindow?.Hide()`. `OpenStatistics` calls the existing statistics-window creation/activation path and never shows the pet. `ExitApplication` closes `_petWindow` and lets `ShutdownMode.OnMainWindowClose` run the established shutdown cleanup.
-- [ ] **Step 3: Reuse one statistics-window path.** Extract the current body of `PetWindow_OnStatisticsRequested` into a private `OpenOrActivateStatisticsWindow()` method; have both the pet event and tray `OpenStatistics` action call it. Preserve activation of an existing statistics window and its existing query/view-model behavior.
-- [ ] **Step 4: Route the single-instance activation callback through the same show action.** In the existing dispatcher callback, call `_trayCommandService.ActivateExistingInstance()` when available; preserve a direct `ShowPet()` fallback for the narrow period before the service is assigned. Repeated activation may activate the same `PetWindow`, but must not construct another window or host.
-- [ ] **Step 5: Dispose the tray before remaining WPF-owned shutdown resources.** In `OnExit`, detach the pet statistics event as today, dispose `_trayCommandService` once and clear its field, then keep all existing collector/store/guard/placement cleanup semantics unchanged. A tray command during shutdown must not trigger another action.
-- [ ] **Step 6: Build and run focused unit tests.** Run the Release app build from Task 3 and both focused service and menu test filters. Expected: zero compile errors, every focused test passes, Hide never calls Exit, and no unsafe UI automation is run.
-- [ ] **Step 7: Review and commit lifecycle integration.** Inspect `App.xaml.cs` to verify startup guard order, statistics reuse, explicit WPF/Threading aliases, and cleanup order; run `git diff --check`; commit only `App.xaml.cs` and any justified focused regression test as `feat: wire tray commands into WPF lifecycle`.
+```csharp
+public interface ITrayPetWindow
+{
+    bool IsVisible { get; }
+    bool IsMinimized { get; }
+    void Show();
+    void Restore();
+    void Hide();
+    void Activate();
+    void Close();
+}
 
+public sealed class TrayApplicationActions : ITrayApplicationActions
+{
+    public TrayApplicationActions(ITrayPetWindow petWindow, Action openStatistics);
+    public void ShowPet();
+    public void HidePet();
+    public void OpenStatistics();
+    public void ExitApplication();
+}
+```
+
+- [ ] **Step 1: Write five action tests before action or App code.** Every fact gets separate Purpose/Coverage/Target effect source comments:
+  - `Show_hidden_pet_shows_and_activates_existing_window`: hidden fake window; effect is one `Show` and one `Activate`, with no `Close`.
+  - `Show_visible_normal_pet_does_not_show_again`: visible, non-minimized fake; effect is no `Show`/`Restore` and one `Activate`.
+  - `Show_minimized_pet_restores_and_activates_existing_window`: visible minimized fake; effect is one `Restore`, one `Activate`, no new `Show` or `Close`.
+  - `Hide_pet_never_closes_application`: fake starts visible; effect is one `Hide`, zero `Close` and zero `Exit` behavior.
+  - `Open_statistics_preserves_hidden_pet_and_exit_closes_window`: use two independently arranged fixtures or split this into two facts if either assertion describes multiple behaviors; statistics invokes only the injected callback while hidden; exit calls `Close` on the same existing fake window once. Prefer two facts if that keeps each assertion focused, so the final test count may be six.
+  Fake `ITrayPetWindow` records operation counts and updates `IsVisible` only when `Show`/`Hide` runs. No WPF Window, UI automation, desktop input, or database is used.
+- [ ] **Step 2: Run focused tests and verify RED.** Run:
+
+```powershell
+$env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
+& 'C:\Program Files\dotnet\dotnet.exe' test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore --filter 'FullyQualifiedName~TrayApplicationActionsTests' --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false
+```
+
+Expected: compilation fails only because `ITrayPetWindow` and `TrayApplicationActions` do not exist; no unrelated build/test failure is accepted as RED evidence.
+- [ ] **Step 3: Implement the framework-independent actions after RED.** `ShowPet` calls `Show()` only if hidden, calls `Restore()` only if minimized, then calls `Activate()`. `HidePet` calls only `Hide()`. `OpenStatistics` calls only the injected open/activate callback and never changes pet visibility. `ExitApplication` calls `Close()` on the existing pet. Rerun the focused tests and confirm GREEN.
+- [ ] **Step 4: Make `PetWindow` implement `ITrayPetWindow`.** Existing `Window` members satisfy `IsVisible`, `Show`, `Hide`, `Activate`, and `Close`; add only `IsMinimized => WindowState == WindowState.Minimized` and `Restore() => WindowState = WindowState.Normal`. Keep all current interaction/placement/event behavior unchanged.
+- [ ] **Step 5: Wire `App` to the tested action class and real host.** Add one `TrayApplicationActions` field and one `TrayCommandService` field. After successful single-instance acquisition and after constructing the one `PetWindow`, create actions with that same window and the shared statistics open/activate callback; show the pet before calling host Start so initialization failure leaves it visible; create/start exactly one WinForms host in the first process only. On a second-instance activation callback, dispatch to `_trayCommandService.ActivateExistingInstance()` if service exists, otherwise `_trayApplicationActions?.ShowPet()`; never construct another window. Keep actions on the WPF Dispatcher.
+- [ ] **Step 6: Reuse statistics and preserve normal shutdown.** Extract the current `PetWindow_OnStatisticsRequested` body to `OpenOrActivateStatisticsWindow()`. Route both the pet event and `OpenStatistics` action to that method; do not show the pet as part of statistics opening. `ExitApplication` closes the main pet window under `ShutdownMode.OnMainWindowClose`. In `OnExit`, detach the pet event, dispose the tray service before the rest of WPF-owned resources, clear tray fields, and preserve current collector/store/guard/placement cleanup.
+- [ ] **Step 7: Verify integration.** Run the Task 3 Release app build, the focused `TrayApplicationActionsTests`, `TrayCommandServiceTests`, `TrayContextMenuFactoryTests`, and `TrayResourceCleanupTests` filters. Expected: all pass; no active-desktop UI suite is run. Check the exact startup/single-instance/shutdown call sequence and `git diff --check`.
+- [ ] **Step 8: Commit lifecycle integration.** Commit only `App.xaml.cs`, `PetWindow.xaml.cs`, the two action-contract/source files, and `TrayApplicationActionsTests.cs` as `feat: wire tray actions into WPF lifecycle`.
 ## Task 5: Full regression, status record, and manual handoff
 
 **Files:**
@@ -239,7 +278,7 @@ Expected: record actual passed/failed/skipped totals. The previous clean baselin
 - Framework choice, no third-party package, WPF dispatcher ownership, no WinForms window/message loop/direct Shell interop: Tasks 1 and 3.
 - Menu labels/order and mapping: Task 3; actual Shell placement and visibility: TRAY-01 manual only.
 - Temporary original generic multi-resolution icon and ownership/disposal: Task 3.
-- Show/hide/statistics/exit behavior and safe initialization failure: Tasks 2 and 4.
+- Show/hide/statistics/exit behavior and safe initialization failure: Tasks 2 and 4, with fake-window unit coverage in Task 4.
 - Single-instance activation and same pet/window: Tasks 2 and 4; real two-process proof: TRAY-03 manual.
 - Taskbar/Explorer recovery: framework-provided .NET 10 behavior is not overstated; TRAY-04 manual only.
 - Required Purpose/Coverage/Target effect for every test: Tasks 2 and 3.
@@ -249,5 +288,5 @@ Expected: record actual passed/failed/skipped totals. The previous clean baselin
 ## Plan Self-Review
 
 - Placeholder scan: no unfinished or vague implementation steps; STA menu tests exercise only managed ContextMenuStrip structure and click mapping; they do not claim Shell coverage.
-- Type consistency: `TrayCommandService` consumes `ITrayIconHost` and `ITrayApplicationActions`; the WinForms host emits `TrayIconCommandEventArgs`; `App` implements the same action signatures; the menu factory maps only the four enum values.
+- Type consistency: `TrayCommandService` consumes `ITrayIconHost` and `ITrayApplicationActions`; the WinForms host emits `TrayIconCommandEventArgs`; `App` composes the tested action class with one existing PetWindow; the menu factory maps only the four enum values.
 - Isolation: save and execute this plan in `C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy` on `codex/wpf-tray-icon`; do not edit the dirty primary checkout.
