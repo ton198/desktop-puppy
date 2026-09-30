@@ -149,8 +149,8 @@ Expected: compilation fails because the new command contracts/service do not exi
 - Create: `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs`
 - Create: `src/DesktopPuppy/Pet/Tray/WinFormsTrayIconHost.cs`
 - Create: `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico`
-- Optional test: `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs`
-- Optional modify: `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj`
+- Test: `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs`
+- Modify: `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj` — enable Windows Forms for the STA context-menu tests.
 
 **Interfaces:**
 - Consumes: `ITrayIconHost`, `TrayIconCommand`, `TrayIconCommandEventArgs` from Task 2.
@@ -158,7 +158,7 @@ Expected: compilation fails because the new command contracts/service do not exi
 
 - [ ] **Step 1: Create a deterministic original `.ico` asset.** Add an original, neutral paw/puppy mark as one `.ico` containing 16×16 and 32×32 representations. Keep its source/design independent of Snoopy and other copyrighted character art. Inspect that Windows can load both sizes before embedding; do not substitute the executable icon or an unowned `SystemIcons` value.
 - [ ] **Step 2: Implement the context menu factory.** Create `ToolStripMenuItem`s with exactly the approved labels and order, add a `ToolStripSeparator` before Exit, attach one click handler per command, and return the menu to its owner. Do not display it or create a `NotifyIcon` in the factory.
-- [ ] **Step 3: Add optional isolated menu tests if factory invocation is deterministic.** For each test add separate Purpose/Coverage/Target effect comments. `Menu_has_approved_labels_and_order` checks all four labels and the separator in order. `Clicking_each_menu_item_emits_its_matching_command_once` calls `PerformClick()` for each menu item on an STA worker thread and checks the exact four-command sequence. Create no `NotifyIcon`, set no `Visible=true`, and do not call active-desktop input APIs. If this cannot run without Shell/UI registration, omit these optional tests and leave the full menu check to TRAY-01 instead of weakening production behavior.
+- [ ] **Step 3: Add isolated menu tests before production host code.** For each test add separate Purpose/Coverage/Target effect comments. `Menu_has_approved_labels_and_order` checks all four labels and the separator in order. `Clicking_each_menu_item_emits_its_matching_command_once` calls `PerformClick()` for each menu item on an STA worker thread and checks the exact four-command sequence. Create no `NotifyIcon`, set no `Visible=true`, and do not call active-desktop input APIs. These tests must create no `NotifyIcon`, set no `Visible=true`, and make no active-desktop input calls; the actual Shell icon and menu remain reserved for TRAY-01.
 - [ ] **Step 4: Implement `WinFormsTrayIconHost.Start()` on the WPF Dispatcher.** Verify dispatcher access; load the embedded `.ico` into an owned `System.Drawing.Icon`; create one `ContextMenuStrip` and one `NotifyIcon`; set the icon, tooltip `Desktop Puppy`, context menu, and `Visible=true`; bridge menu commands to `CommandRequested`. Do not start a WinForms message loop. If any stage fails, clean up every partially-created owned object and rethrow so the command service can leave tray unavailable.
 - [ ] **Step 5: Implement idempotent disposal with explicit ownership.** Detach every menu/click handler and host event bridge; set `NotifyIcon.Visible=false`; clear `NotifyIcon.ContextMenuStrip`; dispose the `NotifyIcon`, each owned menu item/menu, and loaded icon exactly once. Check this order against the .NET 10 `NotifyIcon` and `ToolStrip` implementation/docs while coding; do not assume disposing the notify icon also disposes the menu or icon. Make partial-start cleanup use the same one-time ownership path.
 - [ ] **Step 6: Embed and build.** Add the `.ico` as an embedded resource with a stable manifest name. Build with:
@@ -168,7 +168,7 @@ Expected: compilation fails because the new command contracts/service do not exi
 ```
 
 Expected: successful Release app build without third-party tray packages. Do not claim the Shell icon is visible from the build or from `NotifyIcon.Visible`.
-- [ ] **Step 7: Run optional factory tests and commit.** Run the focused factory test filter if Step 3 was added; expected: the pure menu tests pass without Shell interaction. Run `git diff --check`, then commit only the host, factory, icon, related project setting, and optional test files as `feat: add WinForms tray icon host`.
+- [ ] **Step 7: Run factory tests and commit.** Run `dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore --filter 'FullyQualifiedName~TrayContextMenuFactoryTests' --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false`; expected: all menu tests pass without Shell interaction. Run `git diff --check`, then commit only the app/test project settings, host, factory, icon, and menu-test files as `feat: add WinForms tray icon host`.
 
 ## Task 4: Connect the service to WPF startup, statistics, and shutdown
 
