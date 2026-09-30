@@ -202,7 +202,7 @@ Expected: app build succeeds; all three focused tests pass without Shell interac
 **Interfaces:**
 
 ```csharp
-public interface ITrayPetWindow
+internal interface ITrayPetWindow
 {
     bool IsVisible { get; }
     bool IsMinimized { get; }
@@ -213,7 +213,7 @@ public interface ITrayPetWindow
     void Close();
 }
 
-public sealed class TrayApplicationActions : ITrayApplicationActions
+internal sealed class TrayApplicationActions : ITrayApplicationActions
 {
     public TrayApplicationActions(ITrayPetWindow petWindow, Action openStatistics);
     public void ShowPet();
@@ -223,12 +223,13 @@ public sealed class TrayApplicationActions : ITrayApplicationActions
 }
 ```
 
-- [ ] **Step 1: Write five action tests before action or App code.** Every fact gets separate Purpose/Coverage/Target effect source comments:
+- [ ] **Step 1: Write six action tests before action or App code.** Every fact gets separate Purpose/Coverage/Target effect source comments:
   - `Show_hidden_pet_shows_and_activates_existing_window`: hidden fake window; effect is one `Show` and one `Activate`, with no `Close`.
   - `Show_visible_normal_pet_does_not_show_again`: visible, non-minimized fake; effect is no `Show`/`Restore` and one `Activate`.
   - `Show_minimized_pet_restores_and_activates_existing_window`: visible minimized fake; effect is one `Restore`, one `Activate`, no new `Show` or `Close`.
-  - `Hide_pet_never_closes_application`: fake starts visible; effect is one `Hide`, zero `Close` and zero `Exit` behavior.
-  - `Open_statistics_preserves_hidden_pet_and_exit_closes_window`: use two independently arranged fixtures or split this into two facts if either assertion describes multiple behaviors; statistics invokes only the injected callback while hidden; exit calls `Close` on the same existing fake window once. Prefer two facts if that keeps each assertion focused, so the final test count may be six.
+  - `Hide_pet_never_closes_application`: fake starts visible; effect is one `Hide`, zero `Close`.
+  - `Open_statistics_preserves_hidden_pet`: hidden fake window; effect is exactly one statistics callback and no pet `Show`, `Restore`, `Activate`, or `Close`.
+  - `Exit_closes_existing_pet_window`: effect is exactly one `Close` on the existing fake window.
   Fake `ITrayPetWindow` records operation counts and updates `IsVisible` only when `Show`/`Hide` runs. No WPF Window, UI automation, desktop input, or database is used.
 - [ ] **Step 2: Run focused tests and verify RED.** Run:
 
