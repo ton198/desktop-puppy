@@ -8,6 +8,7 @@ using DesktopPuppy.Native;
 using DesktopPuppy.Pet;
 using DesktopPuppy.Pet.Placement;
 using DesktopPuppy.Pet.Statistics;
+using DesktopPuppy.Pet.Tray;
 using DesktopPuppy.Usage;
 
 namespace DesktopPuppy;
@@ -15,6 +16,8 @@ namespace DesktopPuppy;
 public partial class App : WpfApplication
 {
     private PetWindow? _petWindow;
+    private TrayApplicationActions? _trayApplicationActions;
+    private TrayCommandService? _trayCommandService;
     private ISingleInstanceGuard? _singleInstanceGuard;
     private UsageCollector? _usageCollector;
     private UsageSqliteStore? _usageStore;
@@ -47,6 +50,10 @@ public partial class App : WpfApplication
         _petWindow.StatisticsRequested += PetWindow_OnStatisticsRequested;
         MainWindow = _petWindow;
         _petWindow.Show();
+
+        _trayApplicationActions = new TrayApplicationActions(_petWindow, OpenOrActivateStatisticsWindow);
+        _trayCommandService = new TrayCommandService(new WinFormsTrayIconHost(), _trayApplicationActions);
+        _trayCommandService.Start();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -54,6 +61,20 @@ public partial class App : WpfApplication
         if (_petWindow is not null)
         {
             _petWindow.StatisticsRequested -= PetWindow_OnStatisticsRequested;
+        }
+
+        try
+        {
+            _trayCommandService?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Tray service cleanup failed: {exception}");
+        }
+        finally
+        {
+            _trayCommandService = null;
+            _trayApplicationActions = null;
         }
 
         _usageStatisticsWindow = null;
@@ -258,7 +279,9 @@ public partial class App : WpfApplication
         }
     }
 
-    private void PetWindow_OnStatisticsRequested(object? sender, EventArgs e)
+    private void PetWindow_OnStatisticsRequested(object? sender, EventArgs e) => OpenOrActivateStatisticsWindow();
+
+    private void OpenOrActivateStatisticsWindow()
     {
         if (_usageStatisticsWindow is not null)
         {
@@ -292,22 +315,13 @@ public partial class App : WpfApplication
     {
         Dispatcher.BeginInvoke(() =>
         {
-            if (_petWindow is null)
+            if (_trayCommandService is not null)
             {
+                _trayCommandService.ActivateExistingInstance();
                 return;
             }
 
-            if (!_petWindow.IsVisible)
-            {
-                _petWindow.Show();
-            }
-
-            if (_petWindow.WindowState == WindowState.Minimized)
-            {
-                _petWindow.WindowState = WindowState.Normal;
-            }
-
-            _petWindow.Activate();
+            _trayApplicationActions?.ShowPet();
         });
     }
 

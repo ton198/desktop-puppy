@@ -12,10 +12,11 @@ using System.Windows.Threading;
 using DesktopPuppy.Native;
 using DesktopPuppy.Pet.Interaction;
 using DesktopPuppy.Pet.Placement;
+using DesktopPuppy.Pet.Tray;
 
 namespace DesktopPuppy.Pet;
 
-public partial class PetWindow : Window
+public partial class PetWindow : Window, ITrayPetWindow
 {
     [DllImport("user32.dll")]
     private static extern uint GetDoubleClickTime();
@@ -37,6 +38,12 @@ public partial class PetWindow : Window
     private bool _closed;
     private int _lineIndex;
     private bool _dragStarted;
+
+    bool ITrayPetWindow.IsMinimized => WindowState == WindowState.Minimized;
+
+    void ITrayPetWindow.Restore() => WindowState = WindowState.Normal;
+
+    void ITrayPetWindow.Activate() => _ = Activate();
 
     public event EventHandler? StatisticsRequested;
 
