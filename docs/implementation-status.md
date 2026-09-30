@@ -2,11 +2,11 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-29
-**Latest verified step:** Final-review follow-up on fix base `204b1816db5b83bda87ca207498b24e31f4eda3e`: fresh serialized Release solution build succeeded with 0 warnings / 0 errors, and the full deterministic xUnit suite passed 175/175. `Category=Ui` and both real display hardware scenarios remain **Not run**; see the follow-up below.
+**Last updated:** 2026-09-30
+**Latest verified step:** Final tray review on `codex/wpf-tray-icon` source commit `9bc7f7ea3ce6dfed56b77f49ee5b1633ebfd562b`: focused tray tests 18/18; serialized Release solution build 0 errors with 26 warnings; full deterministic suite 193/193. TRAY-01–04 remain **Not run — Manual required**.
 **Current phase:** Phase 4 in progress — usage statistics and native monitor/DPI placement are implemented on the acceptance branch; real mixed-DPI and monitor-removal acceptance remain unverified.
-**Current verification branch:** `codex/windows-e2e-acceptance`
-**Current verification worktree:** `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`
+**Current verification branch:** `codex/wpf-tray-icon`
+**Current verification worktree:** `C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy`
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
 **Latest integration commit on main (historical):** `2aa0fd7` (`Merge branch 'codex/usage-statistics-window-retention'`)
 **Original implementation base (historical):** `3c2c116`
@@ -807,3 +807,40 @@ The build establishes compilation only. The deterministic suite covers automated
 - **Current status:** Not run — Manual required.
 
 TRAY-01–04 remain pending operator execution; none is complete based on this automated verification.
+
+## Final tray-review verification — 2026-09-30
+
+The source/test fixes were committed first as **`9bc7f7ea3ce6dfed56b77f49ee5b1633ebfd562b`**, based directly on `9a3fb6d16bef3b69b8f7e5ca7df405c6969d69ed` in `C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy`. Fresh checks below ran against that committed source identity using .NET SDK `10.0.401`.
+
+### Verification commands and results
+
+Focused tray test command:
+
+```powershell
+$env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
+& 'C:\Program Files\dotnet\dotnet.exe' test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-restore --filter 'FullyQualifiedName~DesktopPuppy.Tests.Pet.Tray' --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false
+```
+
+**Exit code 0.** One test file matched; **18 passed, 0 failed, 0 skipped, 18 total**.
+
+Serialized Release solution build:
+
+```powershell
+$env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
+& 'C:\Program Files\dotnet\dotnet.exe' build DesktopPuppy.sln --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false -p:NuGetAudit=false
+```
+
+**Exit code 0.** The build succeeded with **0 errors and 26 warnings**: 24 `NU1801` warnings because the configured local NuGet source `C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\` does not exist (12 against the app project and 12 against its generated WPF temporary project), and 2 `WFO0003` high-DPI manifest warnings (the app and generated WPF temporary project). The generated project in this run was `DesktopPuppy_s23ts5db_wpftmp.csproj`. These warnings are reported, not suppressed or described as zero-warning.
+
+Full deterministic unit-test command, run after the solution build:
+
+```powershell
+$env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
+& 'C:\Program Files\dotnet\dotnet.exe' test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false
+```
+
+**Exit code 0.** **193 passed, 0 failed, 0 skipped; 193 total** (3 seconds).
+
+### Scope and manual status
+
+`Category=Ui`, all UI tests, app launch, Explorer automation/restart, and manual TRAY acceptance were **not run**. **TRAY-01, TRAY-02, TRAY-03, and TRAY-04 remain `Not run — Manual required`.** In particular, the second-instance unit test now asserts only that two activations route to the injected `ITrayApplicationActions` while tray startup has failed and the host has only one start attempt. It does not prove WPF window identity; **TRAY-03 remains the real manual check**. The build and deterministic tests establish neither Shell icon visibility nor Explorer behavior.
