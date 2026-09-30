@@ -149,7 +149,7 @@ Expected: compilation fails because the new command contracts/service do not exi
 - Modify: `src/DesktopPuppy/DesktopPuppy.csproj`
 - Modify: `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj` — enable Windows Forms for deterministic STA menu tests.
 - Create: `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs`
-- Create: `src/DesktopPuppy/Properties/AssemblyInfo.cs` — grant `InternalsVisibleTo(""DesktopPuppy.Tests"")` for the focused test assembly.
+- Create: `src/DesktopPuppy/Properties/AssemblyInfo.cs` — grant `InternalsVisibleTo("DesktopPuppy.Tests")` for the focused test assembly.
 - Create: `src/DesktopPuppy/Pet/Tray/WinFormsTrayIconHost.cs`
 - Create: `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico`
 - Create: `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs`
