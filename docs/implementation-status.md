@@ -710,3 +710,100 @@ The separate acceptance executable now has its own `app.manifest` wired through 
 Fresh verification on the current fix: MSBuild evaluates `ApplicationManifest` to `app.manifest`, and the manifest parses as valid XML with `dpiAwareness=PerMonitorV2,PerMonitor` and `dpiAware=true/pm`. A serialized Release solution build succeeded with **0 warnings / 0 errors**; the full deterministic test suite passed **175/175**. The Task 7 section above remains the historical 174-test result from its own run.
 
 `Category=Ui` was **Not run**. The acceptance utility was not launched. E2E-DISPLAY-01 mixed-DPI placement and E2E-DISPLAY-02 monitor removal/primary fallback both remain **Not run**; no display/topology change was made.
+
+## Built-in WinForms tray icon — 2026-09-30
+
+### Selected approach and scope
+
+The tray uses the built-in .NET Windows Forms `NotifyIcon` and `ContextMenuStrip`, hosted on the existing WPF Dispatcher. WPF remains the sole application and lifetime owner; no third-party tray package, WinForms top-level window/message loop, or direct Shell interop was added. The tray host owns its icon/menu resources and uses the embedded generic multi-resolution tray icon.
+
+The Task 1–4 tray implementation spans these files:
+
+- `src/DesktopPuppy/DesktopPuppy.csproj`
+- `src/DesktopPuppy/App.xaml.cs`
+- `src/DesktopPuppy/Pet/PetWindow.xaml.cs`
+- `src/DesktopPuppy/Properties/AssemblyInfo.cs`
+- `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico`
+- `src/DesktopPuppy/Pet/Tray/ITrayApplicationActions.cs`
+- `src/DesktopPuppy/Pet/Tray/ITrayIconHost.cs`
+- `src/DesktopPuppy/Pet/Tray/ITrayPetWindow.cs`
+- `src/DesktopPuppy/Pet/Tray/TrayApplicationActions.cs`
+- `src/DesktopPuppy/Pet/Tray/TrayCommandService.cs`
+- `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs`
+- `src/DesktopPuppy/Pet/Tray/TrayIconCommand.cs`
+- `src/DesktopPuppy/Pet/Tray/TrayResourceCleanup.cs`
+- `src/DesktopPuppy/Pet/Tray/WinFormsTrayIconHost.cs`
+- `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj`
+- `tests/DesktopPuppy.Tests/Pet/Tray/TrayApplicationActionsTests.cs`
+- `tests/DesktopPuppy.Tests/Pet/Tray/TrayCommandServiceTests.cs`
+- `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs`
+- `tests/DesktopPuppy.Tests/Pet/Tray/TrayResourceCleanupTests.cs`
+
+This Task 5 status update changes only this document. The implementation plan and source/test files were not changed in Task 5.
+
+### Fresh automated verification
+
+Run date: **2026-09-30**. Worktree: `C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy`, branch `codex/wpf-tray-icon`. Build/test source identity: **`73dc5fb88c87163e24c68b531306cd448efc47c2`** (Task 4 reviewed and approved). SDK: **10.0.401**.
+
+Serialized Release solution build command:
+
+```powershell
+$env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
+& 'C:\Program Files\dotnet\dotnet.exe' build DesktopPuppy.sln --configuration Release --no-restore --no-incremental --maxcpucount:1 --nodeReuse:false -p:UseSharedCompilation=false -p:NuGetAudit=false
+```
+
+- **Exit code:** 0.
+- **Result:** build succeeded; **0 errors, 26 warnings**. The warning summary comprised **24 NU1801** warnings for the configured nonexistent local NuGet source `C:\Program Files (x86)\Microsoft SDKs\NuGetPackages\` and **2 WFO0003** warnings about the existing high-DPI manifest configuration (including the generated WPF temporary project). These warnings did not fail the build and are recorded, not suppressed or described as zero-warning.
+- **Solution projects in the output:** `DesktopPuppy`, `DesktopPuppy.WindowsAcceptance.Core`, `DesktopPuppy.WindowsAcceptance`, and `DesktopPuppy.Tests`.
+
+Complete deterministic unit-suite command:
+
+```powershell
+& 'C:\Program Files\dotnet\dotnet.exe' test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --configuration Release --no-build --no-restore --verbosity minimal -p:NuGetAudit=false --maxcpucount:1 --nodeReuse:false
+```
+
+- **Exit code:** 0.
+- **Result:** **192 passed, 0 failed, 0 skipped; 192 total**. This is 17 more passing tests than the prior 175-test clean baseline; no regression was observed.
+- `Category=Ui`, active-desktop automation, application launch, Explorer restart, and all manual tray acceptance were **not run**.
+
+The build establishes compilation only. The deterministic suite covers automated unit behavior only; neither result establishes Explorer registration, visible shell placement, real-user menu interaction, two-process behavior, or taskbar recreation.
+
+### Manual tray acceptance — operator required
+
+#### TRAY-01 — Icon and menu
+
+- **Purpose:** Verify real Explorer icon and menu availability/placement.
+- **Coverage:** Run Release; inspect the normal/overflow tray; right-click; inspect labels, order, and placement; dismiss and reopen the menu.
+- **Target effect:** One icon; correctly placed menu with exactly the approved commands; no duplicate icon.
+- **Actual result:** Not executed; no Explorer icon or menu observation was collected. No result is inferred from source inspection, framework behavior, build, or unit tests.
+- **Evidence/build identity:** No manual evidence. Automated evidence is limited to the Release build and 192 deterministic unit tests from source commit `73dc5fb88c87163e24c68b531306cd448efc47c2` (SDK 10.0.401); the app was not launched for acceptance.
+- **Current status:** Not run — Manual required.
+
+#### TRAY-02 — Hide, continue, restore, statistics
+
+- **Purpose:** Prove Hide is not process shutdown.
+- **Coverage:** Hide; verify the process remains; open and close statistics while hidden; restore.
+- **Target effect:** Tracking/statistics continue while hidden and the same pet returns.
+- **Actual result:** Not executed; process continuity, hidden-state statistics behavior, and restoration were not observed manually. No result is inferred from source inspection, framework behavior, build, or unit tests.
+- **Evidence/build identity:** No manual evidence. Automated evidence is limited to the Release build and 192 deterministic unit tests from source commit `73dc5fb88c87163e24c68b531306cd448efc47c2` (SDK 10.0.401); the app was not launched for acceptance.
+- **Current status:** Not run — Manual required.
+
+#### TRAY-03 — Second launch and exit
+
+- **Purpose:** Prove single-instance recovery and normal exit.
+- **Coverage:** Hide; launch the Release app a second time; inspect process/window; exit from tray; separately check the existing close button.
+- **Target effect:** The original pet restores; there is one product process/pet; exit removes the app/icon.
+- **Actual result:** Not executed; second-process activation and both exit paths were not observed manually. No result is inferred from source inspection, framework behavior, build, or unit tests.
+- **Evidence/build identity:** No manual evidence. Automated evidence is limited to the Release build and 192 deterministic unit tests from source commit `73dc5fb88c87163e24c68b531306cd448efc47c2` (SDK 10.0.401); no app launch or second process was used for acceptance.
+- **Current status:** Not run — Manual required.
+
+#### TRAY-04 — Explorer restart
+
+- **Purpose:** Prove framework taskbar recreation behavior on the real machine.
+- **Coverage:** The operator restarts Explorer normally while the app is running, waits for the taskbar, then checks the icon and menu. This check is never automated.
+- **Target effect:** Exactly one icon returns and the menu remains usable without another pet/process.
+- **Actual result:** Not executed; Explorer was not restarted and no post-restart icon/menu observation was collected. No result is inferred from source inspection, framework behavior, build, or unit tests.
+- **Evidence/build identity:** No manual evidence. Automated evidence is limited to the Release build and 192 deterministic unit tests from source commit `73dc5fb88c87163e24c68b531306cd448efc47c2` (SDK 10.0.401); Explorer was not restarted.
+- **Current status:** Not run — Manual required.
+
+TRAY-01–04 remain pending operator execution; none is complete based on this automated verification.
