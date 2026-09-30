@@ -37,6 +37,7 @@
 - `src/DesktopPuppy/Pet/Tray/TrayCommandService.cs` — start availability, failure handling, safe command routing, second-instance activation, and one-time disposal.
 - `src/DesktopPuppy/Pet/Tray/WinFormsTrayIconHost.cs` — create/configure/dispose the built-in WinForms tray components on the dispatcher.
 - `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs` — create the approved menu labels/order and map menu clicks to command identities without registering an icon.
+- `src/DesktopPuppy/Properties/AssemblyInfo.cs` — expose the internal menu factory only to `DesktopPuppy.Tests` for deterministic STA tests.
 - `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico` — original generic multi-resolution tray mark; no Snoopy or copied character art.
 - `src/DesktopPuppy/App.xaml.cs` — own/start/dispose the tray service, implement actions, reuse statistics activation, and route existing single-instance activation.
 - `tests/DesktopPuppy.Tests/Pet/Tray/TrayCommandServiceTests.cs` — fake host/action tests for service lifecycle and routing.
@@ -148,13 +149,14 @@ Expected: compilation fails because the new command contracts/service do not exi
 - Modify: `src/DesktopPuppy/DesktopPuppy.csproj`
 - Modify: `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj` — enable Windows Forms for deterministic STA menu tests.
 - Create: `src/DesktopPuppy/Pet/Tray/TrayContextMenuFactory.cs`
+- Create: `src/DesktopPuppy/Properties/AssemblyInfo.cs` — grant `InternalsVisibleTo(""DesktopPuppy.Tests"")` for the focused test assembly.
 - Create: `src/DesktopPuppy/Pet/Tray/WinFormsTrayIconHost.cs`
 - Create: `src/DesktopPuppy/Pet/Tray/Assets/DesktopPuppyTray.ico`
 - Create: `tests/DesktopPuppy.Tests/Pet/Tray/TrayContextMenuFactoryTests.cs`
 
 **Interfaces:**
 - Consumes: `ITrayIconHost`, `TrayIconCommand`, `TrayIconCommandEventArgs` from Task 2.
-- Produces: `WinFormsTrayIconHost : ITrayIconHost`; `TrayContextMenuFactory.Create(Action<TrayIconCommand>)` returns an unattached `ContextMenuStrip` whose items raise the four commands in spec order.
+- Produces: `WinFormsTrayIconHost : ITrayIconHost`; internal `TrayContextMenuFactory.Create(Action<TrayIconCommand>)` returns an unattached `ContextMenuStrip` whose items raise the four commands in spec order; `DesktopPuppy.Tests` is the sole friend assembly for testing that mapping.
 
 - [ ] **Step 1: Enable Windows Forms in the test project and write the two menu tests first.** Add `<UseWindowsForms>true</UseWindowsForms>` to the test project. Create `TrayContextMenuFactoryTests.cs`. Put separate `// Purpose:`, `// Coverage:`, and `// Target effect:` comments above each `[Fact]`:
   - `Menu_has_approved_labels_and_order` constructs the factory menu on an STA worker thread and asserts the actual item sequence is Show, Hide, Statistics, separator, Exit with the exact labels in the spec.
