@@ -48,13 +48,14 @@
 **Files:**
 - Modify: `src/DesktopPuppy/DesktopPuppy.csproj`
 - Modify: `src/DesktopPuppy/App.xaml.cs`
+- Modify: `src/DesktopPuppy/Pet/PetWindow.xaml.cs` — explicitly select WPF event-argument types shadowed by the new WinForms framework imports.
 
 **Interfaces:**
 - Consumes: existing `App : System.Windows.Application`, `System.Threading.Timer`, and .NET 10 Windows Desktop target.
 - Produces: the same app with both desktop frameworks referenced, and explicit aliases for ambiguous type names.
 
 - [ ] **Step 1: Add the Windows Forms framework property.** In the application property group add exactly `<UseWindowsForms>true</UseWindowsForms>` adjacent to `<UseWPF>true</UseWPF>`. Do not add a tray NuGet `PackageReference`.
-- [ ] **Step 2: Make the WPF application and timer identities explicit.** In `App.xaml.cs`, replace `using System.Windows;` with `using WpfApplication = System.Windows.Application;` plus `using System.Windows;` only if needed for `Window`/`WindowState`, add `using Timer = System.Threading.Timer;`, and change the declaration to `public partial class App : WpfApplication`. Keep WPF types fully qualified or explicitly aliased if the compiler reports another framework-name ambiguity.
+- [ ] **Step 2: Make framework-colliding identities explicit.** In `App.xaml.cs`, add `using WpfApplication = System.Windows.Application;` and `using Timer = System.Threading.Timer;`, then change the declaration to `public partial class App : WpfApplication`; retain the WPF namespace import for `Window`/`WindowState`. In `PetWindow.xaml.cs`, add aliases `WpfDpiChangedEventArgs = System.Windows.DpiChangedEventArgs`, `WpfMouseEventArgs = System.Windows.Input.MouseEventArgs`, and `WpfButton = System.Windows.Controls.Button`; use them in `PetWindow_OnDpiChanged`, `PetWindow_OnMouseMove`, and each `e.OriginalSource is Button` check. This preserves the intended WPF event handling and button filtering while both frameworks are enabled.
 - [ ] **Step 3: Restore the solution for the dual-framework project.** Run:
 
 ```powershell
@@ -70,7 +71,7 @@ Expected: restore succeeds using the existing packages/Windows targeting packs, 
 ```
 
 Expected: current app compiles with WPF and WinForms references enabled; resolve only actual name/reference errors before proceeding.
-- [ ] **Step 5: Review the exact diff and commit.** Run `git diff --check`, verify no package reference was added, then commit only the project and app alias changes as `build: enable WinForms alongside WPF`.
+- [ ] **Step 5: Review the exact diff and commit.** Run `git diff --check`, verify no package reference was added, then commit only the project file and the WPF/Threading aliases in `App.xaml.cs` and `PetWindow.xaml.cs` as `build: enable WinForms alongside WPF`.
 
 ## Task 2: Specify the command service with fake-backed tests (TDD)
 
