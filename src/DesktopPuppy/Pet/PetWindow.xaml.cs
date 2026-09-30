@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using System.Windows.Input;
 using WpfDpiChangedEventArgs = System.Windows.DpiChangedEventArgs;
 using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
+using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Threading;
 using DesktopPuppy.Native;
 using DesktopPuppy.Pet.Interaction;
@@ -181,7 +182,7 @@ public partial class PetWindow : Window
 
     private void PetWindow_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is Button)
+        if (e.OriginalSource is WpfButton)
         {
             return;
         }
@@ -201,7 +202,7 @@ public partial class PetWindow : Window
 
     private void PetWindow_OnMouseMove(object sender, WpfMouseEventArgs e)
     {
-        if (e.OriginalSource is Button)
+        if (e.OriginalSource is WpfButton)
         {
             return;
         }
@@ -216,7 +217,7 @@ public partial class PetWindow : Window
 
     private void PetWindow_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is Button)
+        if (e.OriginalSource is WpfButton)
         {
             return;
         }
@@ -236,7 +237,7 @@ public partial class PetWindow : Window
 
     private void PetWindow_OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is Button)
+        if (e.OriginalSource is WpfButton)
         {
             return;
         }
