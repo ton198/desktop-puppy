@@ -75,7 +75,9 @@ public sealed class TrayCommandServiceTests
         var exception = Record.Exception(service.Start);
         host.Raise(TrayIconCommand.ShowPet);
         Assert.Null(exception); Assert.False(service.IsAvailable); Assert.Equal(1, host.DisposeCount); Assert.Equal(0, actions.TotalCalls);
+        Assert.Equal(0, host.SubscriberCount);
         service.Dispose();
+        Assert.Equal(1, host.DisposeCount);
     }
 
     // Purpose: Keep single-instance recovery independent of tray setup.
@@ -103,12 +105,18 @@ public sealed class TrayCommandServiceTests
     // These fakes exercise only the command/lifecycle seam; they do not prove Shell registration.
     private sealed class FakeTrayIconHost : ITrayIconHost
     {
-        public event EventHandler<TrayIconCommandEventArgs>? CommandRequested;
+        private EventHandler<TrayIconCommandEventArgs>? _commandRequested;
+        public event EventHandler<TrayIconCommandEventArgs>? CommandRequested
+        {
+            add => _commandRequested += value;
+            remove => _commandRequested -= value;
+        }
+        public int SubscriberCount => _commandRequested?.GetInvocationList().Length ?? 0;
         public int StartCount { get; private set; }
         public int DisposeCount { get; private set; }
         public Exception? StartException { get; init; }
         public void Start() { StartCount++; if (StartException is not null) throw StartException; }
-        public void Raise(TrayIconCommand command) => CommandRequested?.Invoke(this, new TrayIconCommandEventArgs(command));
+        public void Raise(TrayIconCommand command) => _commandRequested?.Invoke(this, new TrayIconCommandEventArgs(command));
         public void Dispose() => DisposeCount++;
     }
 

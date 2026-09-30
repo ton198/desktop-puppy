@@ -8,6 +8,7 @@ public sealed class TrayCommandService : IDisposable
     private bool _startAttempted;
     private bool _isAvailable;
     private bool _isDisposed;
+    private bool _hostDisposed;
     private bool _exitRequested;
 
     public TrayCommandService(ITrayIconHost host, ITrayApplicationActions actions)
@@ -31,7 +32,7 @@ public sealed class TrayCommandService : IDisposable
         catch
         {
             _host.CommandRequested -= OnCommandRequested;
-            try { _host.Dispose(); }
+            try { DisposeHostOnce(); }
             catch { /* Host cleanup must not make tray startup fatal. */ }
             Console.Error.WriteLine(StartFailureDiagnostic);
         }
@@ -48,6 +49,13 @@ public sealed class TrayCommandService : IDisposable
         _isDisposed = true;
         _isAvailable = false;
         _host.CommandRequested -= OnCommandRequested;
+        DisposeHostOnce();
+    }
+
+    private void DisposeHostOnce()
+    {
+        if (_hostDisposed) return;
+        _hostDisposed = true;
         _host.Dispose();
     }
 
