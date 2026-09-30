@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Threading;
+using Timer = System.Threading.Timer;
+using WpfApplication = System.Windows.Application;
 using System.Windows;
 using DesktopPuppy.Core.Clock;
 using DesktopPuppy.Native;
@@ -10,7 +12,7 @@ using DesktopPuppy.Usage;
 
 namespace DesktopPuppy;
 
-public partial class App : Application
+public partial class App : WpfApplication
 {
     private PetWindow? _petWindow;
     private ISingleInstanceGuard? _singleInstanceGuard;
