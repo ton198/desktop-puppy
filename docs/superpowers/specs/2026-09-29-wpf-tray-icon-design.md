@@ -1,7 +1,7 @@
 # WPF System Tray Integration Design
 
-**Date:** 2026-09-29  
-**Status:** User-approved approach; awaiting written-spec review  
+**Date:** 2026-09-29
+**Status:** User-approved approach; awaiting written-spec review
 **Scope:** Add a WPF-native tray entry point for the existing Desktop Puppy process
 
 ## 1. Goal
