@@ -3,12 +3,12 @@
 > This file is the handoff point for future conversations. Read it before changing code.
 
 **Last updated:** 2026-09-30
-**Latest verified step:** Final tray review on `codex/wpf-tray-icon` source commit `9bc7f7ea3ce6dfed56b77f49ee5b1633ebfd562b`: focused tray tests 18/18; serialized Release solution build 0 errors with 26 warnings; full deterministic suite 193/193. TRAY-01–04 remain **Not run — Manual required**.
-**Current phase:** Phase 4 in progress — usage statistics and native monitor/DPI placement are implemented on the acceptance branch; real mixed-DPI and monitor-removal acceptance remain unverified.
-**Current verification branch:** `codex/wpf-tray-icon`
-**Current verification worktree:** `C:\Users\ton20\.codex\worktrees\wpf-tray-icon\desktop-puppy`
+**Latest verified step:** WinForms tray integration fast-forward-merged to `main` at `b1cfbda`; post-merge Release solution build succeeded with 0 errors and 5 warnings, and the full deterministic xUnit suite passed 193/193. TRAY-01–04 and real display hardware acceptance remain **Not run**.
+**Current phase:** Phase 4 in progress — usage statistics, native monitor/DPI placement, and the built-in WinForms tray are implemented; operator tray and hardware acceptance remain pending.
+**Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
+**Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
-**Latest integration commit on main (historical):** `2aa0fd7` (`Merge branch 'codex/usage-statistics-window-retention'`)
+**Latest tray integration commit on main:** `b1cfbda330c99267871baf92a42d3b484c4d5fe1` (`docs: record tray final review verification`; fast-forward target; not pushed)
 **Original implementation base (historical):** `3c2c116`
 
 ## Completed
@@ -659,7 +659,7 @@ Reviewed the acceptance controller, event observer, owned-directory helper, and 
 
 ### Current branch and production connection
 
-Task 7 verified branch `codex/windows-e2e-acceptance` at starting commit `7a22be97aa92fc69d1bb2128bc50e85c53c31640` in `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`. The only tracked Task 7 change updates this status document; it does not merge the branch into `main`.
+At Task 7 verification time, branch `codex/windows-e2e-acceptance` was at starting commit `7a22be97aa92fc69d1bb2128bc50e85c53c31640` in `C:\Users\ton20\.codex\worktrees\windows-e2e-acceptance\desktop-puppy`. The only tracked Task 7 change updated this status document; the branch had not yet been merged then. After the final-review fixes were accepted, the branch was fast-forward-merged into `main` at `717bf593bf6d013bd34634a6e7efff87ebcc828f`; the merge was not pushed.
 
 The native placement path is connected to the production pet window:
 
@@ -710,6 +710,17 @@ The separate acceptance executable now has its own `app.manifest` wired through 
 Fresh verification on the current fix: MSBuild evaluates `ApplicationManifest` to `app.manifest`, and the manifest parses as valid XML with `dpiAwareness=PerMonitorV2,PerMonitor` and `dpiAware=true/pm`. A serialized Release solution build succeeded with **0 warnings / 0 errors**; the full deterministic test suite passed **175/175**. The Task 7 section above remains the historical 174-test result from its own run.
 
 `Category=Ui` was **Not run**. The acceptance utility was not launched. E2E-DISPLAY-01 mixed-DPI placement and E2E-DISPLAY-02 monitor removal/primary fallback both remain **Not run**; no display/topology change was made.
+
+## Post-merge verification on main — 2026-09-29
+
+The reviewed `codex/windows-e2e-acceptance` branch, including the final-review fixes, is now fast-forward-merged into `main` at `717bf593bf6d013bd34634a6e7efff87ebcc828f`. No push was performed. The Task 7 section above remains a historical record of its own verification (174/174 unit tests and a zero-warning build); it is not overwritten by the subsequent main-checkout run.
+
+Post-merge verification in the main checkout:
+
+- **Full deterministic unit suite:** 175 passed, 0 failed, 0 skipped.
+- **Release solution build:** succeeded with 0 errors and 3 `NU1900` warnings. NuGet could not reach `https://api.nuget.org/v3/index.json` to retrieve vulnerability metadata; this environment/source warning is recorded rather than described as a warning-free build.
+- **Windows UI tests (`Category=Ui`):** **Not run**. No UI harness that injects input was started on the active desktop.
+- **Acceptance utilities:** not launched. **E2E-DISPLAY-01 mixed-DPI placement** and **E2E-DISPLAY-02 monitor removal/primary fallback** remain **Not run**. No display settings or monitor topology were changed, and no synthetic hardware pass was recorded.
 
 ## Built-in WinForms tray icon — 2026-09-30
 
@@ -844,3 +855,13 @@ $env:DOTNET_CLI_HOME = (Join-Path (Get-Location) '.dotnet-home')
 ### Scope and manual status
 
 `Category=Ui`, all UI tests, app launch, Explorer automation/restart, and manual TRAY acceptance were **not run**. **TRAY-01, TRAY-02, TRAY-03, and TRAY-04 remain `Not run — Manual required`.** In particular, the second-instance unit test now asserts only that two activations route to the injected `ITrayApplicationActions` while tray startup has failed and the host has only one start attempt. It does not prove WPF window identity; **TRAY-03 remains the real manual check**. The build and deterministic tests establish neither Shell icon visibility nor Explorer behavior.
+## Tray merge verification on main — 2026-09-30
+
+The reviewed `codex/wpf-tray-icon` branch was fast-forward-merged into `main` at `b1cfbda330c99267871baf92a42d3b484c4d5fe1`; it was not pushed. The existing latest status content from the primary checkout was retained as the base for this update; this section adds the tray implementation record rather than replacing historical or later status notes.
+
+Fresh verification ran from the primary `main` worktree after the merge using .NET SDK `10.0.401`:
+
+- **Serialized Release solution build:** succeeded, 0 errors, 5 warnings: 3 `NU1900` vulnerability-data-source warnings because `https://api.nuget.org/v3/index.json` was unreachable, and 2 `WFO0003` high-DPI manifest warnings. No warnings were suppressed.
+- **Full deterministic unit suite:** 193 passed, 0 failed, 0 skipped.
+- **UI/active-desktop tests:** not run. The application was not launched for acceptance; Explorer was not restarted.
+- **TRAY-01–04:** remain **Not run — Manual required**, as detailed above. No real Explorer icon/menu behavior, hidden-window statistics, second-process restore/exit, or taskbar recreation is inferred from this build or unit suite.
