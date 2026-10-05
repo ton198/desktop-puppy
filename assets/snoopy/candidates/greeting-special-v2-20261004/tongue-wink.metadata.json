@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE wink-only frame from this exact tongue-out keyframe. Remove ONLY the pink tongue and its contour, leaving a closed smiling mouth along the existing smile line with same endpoints. Keep the viewer RIGHT eye winked EXACTLY the same; other black oval eye and eyebrows unchanged. This is the immediate predecessor and recovery frame for tongue-out, not a new facial expression. All head/ear/nose/tuft/collar/body/limbs/tail/feet/canvas/scale/location must stay identical. True alpha transparent background, original white opaque fill and thick black outlines/red collar. No additions, props, text, effects, shadows or panels. One full-body image.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021515Z-9a84380ba197.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024805Z-47de3f22bcaa.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "1e3308d5f9e63765a1c36933de297c80c442f4218ee11bb9189040e516e87517",
+  "created_at": "2026-10-05T02:48:05.112881+00:00"
+}

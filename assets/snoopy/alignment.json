@@ -1,0 +1,12 @@
+{
+  "canvas": [1254, 1254],
+  "crop": [280, 90, 980, 1150],
+  "eye_roi": [510, 270, 685, 380],
+  "reference": {"head_top":113, "collar_y":619, "collar_x":630, "foot_y":1130},
+  "poses": {
+    "greeting-low": {"head_top":112,"collar_y":619,"collar_x":630,"foot_y":1131,"scale_x":1.0,"dx":0,"dy":0},
+    "greeting-high": {"head_top":117,"collar_y":629,"collar_x":637,"foot_y":1147,"scale_x":0.98,"dx":0,"dy":0}
+  },
+  "blink_ms": [1800,60,100,60,900],
+  "greeting_ms": [1200,140,450,140,900]
+}

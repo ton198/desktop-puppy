@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE small outward wave frame derived from this exact raised-hand keyframe. Only rotate foreground forearm/paw 12 degrees outward (viewer right) around the SAME elbow. Paw moves slightly right and down, still near shoulder height. Same paw size, SAME THREE rounded lobes and two black separators, palm faces viewer as before; no fourth lobe, no new gesture. Shoulder, upper arm and elbow stay fixed. Everything else head/face/ear/collar/body/rump/tail/legs/feet/canvas/scale untouched. It must pair with an inward frame as a modest side-to-side wave. Original thick black contours and white opaque fill/red collar. Genuine alpha transparency outside dog. No effects/text/shadows/props/sheet.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024150Z-3364044ec543.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024606Z-2b790371a3d7.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "fecc8a958b16468e6f193540eec707b603fd9df2962baba93ab5805509547f74",
+  "created_at": "2026-10-05T02:46:06.888600+00:00"
+}

@@ -92,6 +92,50 @@ public sealed class WindowTitleDebouncerTests
         Assert.Empty(updates);
     }
 
+    [Fact]
+    public void Durable_checkpoints_are_throttled_to_thirty_seconds_and_keep_one_interval_identity()
+    {
+        var updates = new List<WindowTitleInterval>();
+        var debouncer = new WindowTitleDebouncer(TimeSpan.FromSeconds(2), updates.Add);
+        debouncer.OnTitleChanged(Snapshot("Code", "main.cs"), Start);
+        debouncer.OnTitleChanged(Snapshot("Code", "main.cs"), Start.AddSeconds(2));
+        debouncer.Advance(Start.AddSeconds(2));
+        var intervalId = Assert.Single(updates).Id;
+        debouncer.OnTitleChanged(Snapshot("Code", "main.cs"), Start.AddSeconds(31.999));
+        debouncer.Advance(Start.AddSeconds(31.999));
+        Assert.Single(updates);
+        debouncer.OnTitleChanged(Snapshot("Code", "main.cs"), Start.AddSeconds(32));
+        debouncer.Advance(Start.AddSeconds(32));
+        Assert.Equal(2, updates.Count);
+        Assert.All(updates, update => Assert.Equal(intervalId, update.Id));
+        Assert.All(updates, update => Assert.Null(update.EndedAt));
+    }
+
+    [Fact]
+    public void Failed_title_close_keeps_the_interval_available_for_retry()
+    {
+        var updates = new List<WindowTitleInterval>();
+        var failClose = true;
+        var debouncer = new WindowTitleDebouncer(TimeSpan.FromSeconds(2), interval =>
+        {
+            if (interval.EndedAt is not null && failClose)
+            {
+                failClose = false;
+                throw new InvalidOperationException("Simulated close failure.");
+            }
+            updates.Add(interval);
+        });
+        debouncer.OnTitleChanged(Snapshot("Code", "old.cs"), Start);
+        debouncer.Advance(Start.AddSeconds(2));
+        var originalId = Assert.Single(updates).Id;
+        Assert.Throws<InvalidOperationException>(() =>
+            debouncer.OnTitleChanged(Snapshot("Code", "new.cs"), Start.AddSeconds(5)));
+        debouncer.OnTitleChanged(Snapshot("Code", "new.cs"), Start.AddSeconds(5.25));
+        var closed = Assert.Single(updates, interval => interval.EndedAt is not null);
+        Assert.Equal(originalId, closed.Id);
+        Assert.Equal(Start.AddSeconds(5), closed.EndedAt);
+    }
+
     private static ForegroundWindowSnapshot Snapshot(string processName, string title)
     {
         return new ForegroundWindowSnapshot((nint)42, 42, processName, title);

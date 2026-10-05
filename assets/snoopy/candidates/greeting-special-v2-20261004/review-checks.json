@@ -1,0 +1,272 @@
+[
+  {
+    "name": "greeting-raised",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "conditional: motion timing and arm excursion await user review",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "greeting-mid",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "conditional: motion timing and arm excursion await user review",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "greeting-start",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "conditional: motion timing and arm excursion await user review",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "greeting-in",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "conditional: motion timing and arm excursion await user review",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "greeting-out",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "conditional: motion timing and arm excursion await user review",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "tongue-ready",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "tongue-wink",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "tongue-short",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "glance-entry-rejected",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": true,
+    "visual_status": "rejected: visually too similar to keyframe"
+  },
+  {
+    "name": "glance-brow",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "smile-half",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "smile-release",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "glance-entry",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": false,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "tongue-peak",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": true,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "glance-peak",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": true,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  },
+  {
+    "name": "smile-peak",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": [
+      0,
+      255
+    ],
+    "master_equal_outside_group_mask": true,
+    "reused": true,
+    "rejected": false,
+    "visual_status": "user accepted",
+    "prior_visual_status": "static group review accepted; runtime pending",
+    "user_accepted_local_date": "2026-10-05"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE anticipation frame of the SAME tongue-out gesture in reference. Facial edit ONLY: remove tongue completely, return mouth to same smile curve (same endpoints); the winking foreground eye on viewer right now OPEN as a black oval like the other eye. Keep eyebrows same, no side glance or smug half-lids. Preserve exact head silhouette/ear/nose/tuft/collar/body/limbs/tail/feet/frame placement and style. This leads smoothly to reference wink/tongue-out. Only changes are reopening one eye and retracting tongue. Opaque white character, red collar, thick black contours, true transparent alpha. No props/text/shadows/effects/extra poses. Entire same full-body square canvas.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021515Z-9a84380ba197.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024704Z-99cd722c0771.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "9ccb37322937a6dd2419342b46da1735273417e4331da13ef31726e069204617",
+  "created_at": "2026-10-05T02:47:04.085560+00:00"
+}

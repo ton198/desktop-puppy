@@ -1,0 +1,102 @@
+[
+  {
+    "name": "drag-lift",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：两脚下垂且分离；固定非腿部区域。"
+  },
+  {
+    "name": "landing",
+    "unchanged_outside_edit_mask": null,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "conditional candidate",
+    "visual_review": "有条件保留：脚底已对齐，屈膝清楚；下蹲幅度较明显，播放节奏仍需用户及程序内验收。"
+  },
+  {
+    "name": "greeting-mid",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：肩膀连接可读，无额外手臂；与已有低/高位的连续播放仍需验收。"
+  },
+  {
+    "name": "click-smug",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：半眯眼挑眉，区别于开心。"
+  },
+  {
+    "name": "hit-startle",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：闭眼张嘴受惊，无伤痕。"
+  },
+  {
+    "name": "hit-recoil",
+    "unchanged_outside_edit_mask": null,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "conditional candidate",
+    "visual_review": "有条件保留：双手收至胸前，脚底对齐；头部轻微转动，需程序内检查返回恢复帧的跳变。"
+  },
+  {
+    "name": "hit-recover",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：垂眼撇嘴，装委屈。"
+  },
+  {
+    "name": "special-anticipate",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：斜眼微笑，蓄势表情。"
+  },
+  {
+    "name": "special-tongue",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：一眼眨眼，小舌头，无复杂口腔。"
+  },
+  {
+    "name": "special-settle",
+    "unchanged_outside_edit_mask": true,
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "status": "static visual accepted; runtime approval pending",
+    "visual_review": "静态验收通过：闭眼微笑收势。"
+  }
+]

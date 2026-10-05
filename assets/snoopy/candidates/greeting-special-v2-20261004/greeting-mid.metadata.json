@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE immediately preceding frame for this raised-hand greeting. Edit ONLY foreground arm on viewer right. Lower the SAME three-lobed paw by about one paw height and slightly toward torso, rotating forearm downward about 25 degrees around the SAME elbow. Paw at upper chest level, elbow stays near same upper belly location. Preserve exact paw size, THREE rounded lobes/two separator strokes, thick black contour, shoulder attachment and arm thickness. This is halfway from hanging arm to this reference raised arm. Everything else including head/face/red collar/back arm/rump/tail/legs/feet, square canvas, size and placement unchanged. Opaque white character, genuine alpha transparency. No additional limbs/props/shadow/text/sheet. Preserve same character and hand, not a new gesture.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024150Z-3364044ec543.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024256Z-9156a9bad664.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "6308339bd3a62ab987d38fd80c151bff093d550475442f4dbfe32b0a29266086",
+  "created_at": "2026-10-05T02:42:56.947944+00:00"
+}

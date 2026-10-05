@@ -1,0 +1,116 @@
+{
+  "canvas": [
+    1254,
+    1254
+  ],
+  "crop": [
+    280,
+    90,
+    980,
+    1150
+  ],
+  "frames": {
+    "idle": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "blink-half": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "blink-closed": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "happy": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "greeting-low-aligned": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "greeting-low": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    },
+    "greeting-high-aligned": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        305,
+        113,
+        954,
+        1130
+      ]
+    },
+    "greeting-high": {
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha_bbox_gt128": [
+        303,
+        113,
+        952,
+        1130
+      ]
+    }
+  },
+  "invariants": [
+    "Blink pixels outside eye ROI are identical to the master.",
+    "Stabilized greeting pixels above y570, below y920 and rump/tail x>=755,y>=833 are identical to the master.",
+    "All frames use one canvas and one review crop."
+  ],
+  "status": "review candidates, not production-approved"
+}

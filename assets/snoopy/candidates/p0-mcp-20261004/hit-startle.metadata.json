@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE cartoon startled flinch facial keyframe of the EXACT puppy reference. Change only expression: both eyes squeezed shut with short simple curved black eyelid strokes, eyebrows raised with mild surprise, mouth a small open rounded gasp replacing the smile. No teeth, no detailed mouth, simple black mouth interior. Head silhouette, nose, ear, tuft, red collar, whole body and planted feet keep the original shape, scale and pixel position. White opaque fill and thick black contours consistent. Same full-body square framing. A gentle funny double-click reaction, no pain injury or violence. True transparent alpha outside character. No attacker, hand, weapons, bruise, tears, blood, stars, effect marks, floor, shadow, text, watermark or sheet.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021106Z-962dd21fec53.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "4222b5c16adb314e395c6b277c8eef7cdabfc0aae115f96f2b1f18ce95e753a4",
+  "created_at": "2026-10-05T02:11:06.334940+00:00"
+}

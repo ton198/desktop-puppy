@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "Correct the failed lead-in frame: make BOTH eyes CLEARLY OPEN simple vertical black ovals with NO upper eyelid strokes, at the same eye centers as this reference. Do not retain reference's sideways half-lidded eyes. This is a neutral-eye entry pose preceding that side glance. Keep BOTH eyebrows and closed smile EXACTLY from reference, and everything else unchanged: head silhouette/nose/ear/tuft/red collar/body/arms/tail/legs/feet/square canvas/scale/pixel location. Opaque white dog and same black outlines. True alpha transparent background. No objects/text/effects/shadows/panels. Facial edit only, one full body.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021408Z-2342f532f582.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T025503Z-a68f96eff35b.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "6ed2faddd2f547c66e1bdb83fbfcaae5c72b4796d3e1fad3d1a51ad45b40d4b0",
+  "created_at": "2026-10-05T02:55:03.707020+00:00"
+}

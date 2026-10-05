@@ -1,0 +1,447 @@
+{
+  "master": {
+    "collar": [
+      629.4060211554109,
+      620.3592351505289
+    ],
+    "top": 113,
+    "bbox": [
+      303,
+      113,
+      952,
+      1130
+    ]
+  },
+  "frames": [
+    {
+      "name": "drag-lift",
+      "raw_anchors": {
+        "collar": [
+          629.3023443815683,
+          620.6390460792239
+        ],
+        "top": 113,
+        "bbox": [
+          303,
+          113,
+          952,
+          1157
+        ]
+      },
+      "scale": 0.9994487994356301,
+      "translation": [
+        0.4505485812250072,
+        0.0622856637737641
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.4534741974807,
+          620.3364485981308
+        ],
+        "top": 113,
+        "bbox": [
+          303,
+          113,
+          951,
+          1157
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "landing",
+      "raw_anchors": {
+        "collar": [
+          633.6104117046615,
+          685.0364069411364
+        ],
+        "top": 157,
+        "bbox": [
+          293,
+          157,
+          963,
+          1123
+        ]
+      },
+      "scale": 0.9608413898761482,
+      "translation": [
+        20.606912533105515,
+        -37.852098210555255
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.2865044247787,
+          620.2684365781711
+        ],
+        "top": 113,
+        "bbox": [
+          302,
+          113,
+          946,
+          1041
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "greeting-mid",
+      "raw_anchors": {
+        "collar": [
+          628.8394909688013,
+          620.5743021346469
+        ],
+        "top": 112,
+        "bbox": [
+          303,
+          112,
+          951,
+          1130
+        ]
+      },
+      "scale": 0.9976108368452397,
+      "translation": [
+        2.0689303286904988,
+        1.2675862733332224
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.4583676834295,
+          620.3268755152515
+        ],
+        "top": 113,
+        "bbox": [
+          304,
+          113,
+          951,
+          1129
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "click-smug",
+      "raw_anchors": {
+        "collar": [
+          629.7054963084496,
+          620.7563576702215
+        ],
+        "top": 113,
+        "bbox": [
+          304,
+          113,
+          951,
+          1130
+        ]
+      },
+      "scale": 0.9992178876469124,
+      "translation": [
+        0.19302529443132244,
+        0.08837869589888214
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.4513602638087,
+          620.3594394064303
+        ],
+        "top": 113,
+        "bbox": [
+          304,
+          113,
+          950,
+          1129
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "hit-startle",
+      "raw_anchors": {
+        "collar": [
+          629.3703552470396,
+          620.5896284197631
+        ],
+        "top": 113,
+        "bbox": [
+          302,
+          113,
+          954,
+          1130
+        ]
+      },
+      "scale": 0.9995461032764765,
+      "translation": [
+        0.3213350505008066,
+        0.051290329758103326
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.3424489795918,
+          620.3069387755102
+        ],
+        "top": 113,
+        "bbox": [
+          302,
+          113,
+          954,
+          1130
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "hit-recoil",
+      "raw_anchors": {
+        "collar": [
+          632.226429675425,
+          614.750772797527
+        ],
+        "top": 107,
+        "bbox": [
+          302,
+          107,
+          982,
+          1132
+        ]
+      },
+      "scale": 0.9992288782844368,
+      "translation": [
+        -2.332884990938396,
+        6.082510023565305
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.428793774319,
+          620.269260700389
+        ],
+        "top": 113,
+        "bbox": [
+          299,
+          113,
+          979,
+          1137
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "hit-recover",
+      "raw_anchors": {
+        "collar": [
+          629.1008574928542,
+          620.8656594528379
+        ],
+        "top": 112,
+        "bbox": [
+          302,
+          112,
+          952,
+          1130
+        ]
+      },
+      "scale": 0.9970396424393644,
+      "translation": [
+        2.1675271424380753,
+        1.3315600467911963
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.53300330033,
+          620.3378712871287
+        ],
+        "top": 113,
+        "bbox": [
+          304,
+          113,
+          951,
+          1128
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "special-anticipate",
+      "raw_anchors": {
+        "collar": [
+          629.5964768537484,
+          620.8074559606719
+        ],
+        "top": 113,
+        "bbox": [
+          302,
+          113,
+          951,
+          1130
+        ]
+      },
+      "scale": 0.9991173410219135,
+      "translation": [
+        0.3652632845290782,
+        0.09974046452373386
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.5571134020619,
+          620.3294845360824
+        ],
+        "top": 113,
+        "bbox": [
+          303,
+          113,
+          950,
+          1130
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "special-tongue",
+      "raw_anchors": {
+        "collar": [
+          629.1995033112582,
+          620.523178807947
+        ],
+        "top": 112,
+        "bbox": [
+          303,
+          112,
+          952,
+          1131
+        ]
+      },
+      "scale": 0.9977111295887306,
+      "translation": [
+        1.6466739700672406,
+        1.256353486062153
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.4101286841013,
+          620.3150684931506
+        ],
+        "top": 113,
+        "bbox": [
+          304,
+          113,
+          951,
+          1130
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    },
+    {
+      "name": "special-settle",
+      "raw_anchors": {
+        "collar": [
+          628.414897877453,
+          621.7192631157388
+        ],
+        "top": 112,
+        "bbox": [
+          303,
+          112,
+          951,
+          1131
+        ]
+      },
+      "scale": 0.995369945505328,
+      "translation": [
+        3.900718500394305,
+        1.5185661034032591
+      ],
+      "aligned_anchors": {
+        "collar": [
+          629.4367629117528,
+          620.2757218381456
+        ],
+        "top": 113,
+        "bbox": [
+          305,
+          113,
+          951,
+          1127
+        ]
+      },
+      "size": [
+        1254,
+        1254
+      ],
+      "alpha": [
+        0,
+        255
+      ],
+      "status": "visual candidate; not production approved"
+    }
+  ]
+}

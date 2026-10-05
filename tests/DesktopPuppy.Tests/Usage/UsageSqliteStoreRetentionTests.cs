@@ -117,6 +117,21 @@ public sealed class UsageSqliteStoreRetentionTests : IDisposable
     }
 
     [Fact]
+    public void Checkpoint_upsert_does_not_restore_a_title_start_removed_by_retention()
+    {
+        var cutoff = At(2026, 9, 10, 0);
+        using var store = CreateStore();
+        var original = Title("Code", "main.cs", cutoff.AddHours(-1), null);
+        store.UpsertWindowTitleInterval(original);
+        store.PruneBefore(cutoff);
+        // The debouncer still holds the original start when its next checkpoint is written.
+        store.UpsertWindowTitleInterval(original with { LastConfirmedAt = cutoff.AddMinutes(1) });
+        var checkpointed = Assert.Single(store.ReadWindowTitleIntervals());
+        Assert.Equal(cutoff, checkpointed.StartedAt);
+        Assert.Null(checkpointed.EndedAt);
+    }
+
+    [Fact]
     public void Repeated_retention_cleanup_is_idempotent()
     {
         var cutoff = At(2026, 9, 10, 0);

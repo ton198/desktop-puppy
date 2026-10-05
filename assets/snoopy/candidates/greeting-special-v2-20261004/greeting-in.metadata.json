@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE small inward wave frame derived from this exact raised-hand greeting keyframe. Only rotate foreground forearm/paw 12 degrees inward (toward viewer left) about elbow, paw shifts slightly closer to collar but MUST NOT touch collar/ear. Keep same paw size and orientation toward viewer, same THREE rounded lobes and two black separators. Same shoulder and elbow, upper arm, body and all other parts fixed. Small readable waving motion, NOT a new arm pose or clenched fist. Exact head/face/collar/ear/rump/tail/legs/feet location and canvas/scale. Thick black lines, opaque white character, true transparent alpha, no motion marks/shadow/text/objects/sheet.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024150Z-3364044ec543.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024512Z-10520552adb3.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "205d16154769afe36cc617f449a7e40c7e14a8389faaeb7778da77af4bb33544",
+  "created_at": "2026-10-05T02:45:12.591748+00:00"
+}

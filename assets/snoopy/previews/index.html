@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>史努比素材 · 对齐预览</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f4f7;color:#202936;font:16px/1.6 "Segoe UI","Microsoft YaHei",sans-serif}main{max-width:1100px;margin:28px auto;padding:0 24px}h1{font-size:26px}h2{font-size:19px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{padding:22px;background:white;border-radius:16px;margin-bottom:20px;border:1px solid #dfe4eb}img{max-width:100%;height:auto}label{display:block;margin:12px 0}button,select,input{font:inherit;padding:5px 10px}input[type=number]{width:90px}canvas{width:100%;max-width:330px;height:auto;background:repeating-conic-gradient(#e9edf1 0% 25%,#fff 0% 50%) 0/24px 24px;display:block;margin:auto}.hint{color:#526071;font-size:14px}code{background:#eef1f5;padding:2px 6px;border-radius:4px}@media(max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+<main><h1>史努比素材 · 第二版 · 固定臀部轮廓</h1><p>原图均已保留。下方 PNG 是透明素材；GIF 的浅色 / 深色背景仅用于检查。当前是候选版本，未接入桌宠程序。</p>
+<div class="grid"><section class="card"><h2>眨眼 · 约 200px 人物高度</h2><img src="blink-desktop.gif" alt="固定头部和身体，仅眼部改变的眨眼动画"><p class="hint">睁眼 → 半闭 → 闭眼 → 半闭 → 睁眼</p><details><summary>查看处理前后</summary><img src="blink-comparison.gif" alt="左原图，右局部合成"></details></section>
+<section class="card"><h2>抬手打招呼 · 约 200px 人物高度</h2><img src="greeting-rump-fixed.gif" alt="低位抬手到高位打招呼的动画"><p class="hint">站立 → 低位手 → 高位手 → 低位手 → 站立。不是左右摆手。</p><details><summary>查看处理前后</summary><img src="greeting-comparison.gif" alt="左原图，右稳定头部及脚部的候选版本"></details></section></div>
+<section class="card"><h2>位置微调 / 母版叠图</h2><div class="grid"><div><canvas id="stage" width="700" height="1060" aria-label="选定帧的母版叠图与位置微调"></canvas></div><div>
+<label>帧 <select id="pose"><option value="greeting-high">高位打招呼</option><option value="greeting-low">低位抬手</option><option value="blink-half">半闭眼</option><option value="blink-closed">闭眼</option></select></label>
+<label>版本 <select id="variant"><option value="stable">局部合成候选</option><option value="aligned">整图位置对齐（手臂帧）</option><option value="source">未经处理原图</option></select></label>
+<label>左右偏移 <input id="dx" type="number" value="0" min="-50" max="50" step="1"> 原图 px</label>
+<label>上下偏移 <input id="dy" type="number" value="0" min="-50" max="50" step="1"> 原图 px</label>
+<label>整体缩放 <input id="scale" type="number" value="100" min="90" max="110" step="0.1"> %（以项圈为中心）</label>
+<label><input id="overlay" type="checkbox" checked> 显示 50% 母版叠图</label>
+<label><input id="guides" type="checkbox" checked> 显示项圈 / 脚底参考线</label>
+<button id="reset" type="button">重置</button><p id="values" class="hint" aria-live="polite"></p>
+<p class="hint">这里的调整只用于比较，不会覆盖素材。选好参数后把帧名、版本和数值发给我，我再固化到素材中。建议先取消叠图看轮廓，再打开叠图看重影。</p>
+</div></div></section>
+<section class="card"><h2>帧总览</h2><img src="contact-sheet.png" alt="站立、半闭眼、闭眼、低位抬手、高位抬手五帧总览"></section>
+</main><script>
+const $=id=>document.getElementById(id), cache={};
+const canvas=$('stage'),ctx=canvas.getContext('2d'); let request=0;
+function image(src){if(!cache[src])cache[src]=new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=src;});return cache[src];}
+async function render(){const ticket=++request; const name=$('pose').value,variant=$('variant').value;
+ const file=variant==='source'?'../sources/'+name+'.png':'../frames/'+name+(variant==='aligned'&&name.startsWith('greeting')?'-aligned':'')+'.png';
+ try{const [ref,im]=await Promise.all([image('../frames/idle.png'),image(file)]);if(ticket!==request)return;
+ const dx=Number($('dx').value)||0,dy=Number($('dy').value)||0,s=(Number($('scale').value)||100)/100;
+ ctx.clearRect(0,0,700,1060);ctx.save();ctx.translate(-280,-90);
+ if($('overlay').checked){ctx.globalAlpha=.5;ctx.drawImage(ref,0,0);}
+ ctx.translate(630+dx,619+dy);ctx.scale(s,s);ctx.translate(-630,-619);ctx.drawImage(im,0,0);ctx.restore();
+ if($('guides').checked){ctx.strokeStyle='#d56350';ctx.lineWidth=2;ctx.setLineDash([8,8]);for(const y of [619-90,1130-90]){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(700,y);ctx.stroke();}ctx.setLineDash([]);}
+ $('values').textContent=`${name} / ${variant} · x ${dx}, y ${dy}, scale ${(s*100).toFixed(1)}%`;
+ }catch(e){$('values').textContent='图片加载失败，请保持 previews、frames、sources 的目录关系。';}}
+for(const id of ['pose','variant','dx','dy','scale','overlay','guides'])$(id).addEventListener('input',render);
+$('reset').addEventListener('click',()=>{$('dx').value=0;$('dy').value=0;$('scale').value=100;render();});render();
+</script></html>

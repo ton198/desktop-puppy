@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "Edit this exact desktop puppy into ONE landing-cushion keyframe. Keep identity, square framing, same character size, white opaque body, red collar, thick black outlines and left-facing three-quarter view. Head/ear/nose/tuft/eyes/smile must stay identical in shape. A very gentle landing after mouse drag: both feet flat on the same original baseline, knees slightly bent, belly and torso lowered a little, arms relaxed. Subtle squat, NOT seated, NOT a jump, no extreme compression. Both feet readable; preserve round rump and short legs, no extra limbs. Entire character with padding. True transparent alpha background, no floor, shadow, effects, objects, text, checkerboard, watermark or sheet. Keep foot baseline and horizontal center matching the reference; head may lower only slightly for this intentional landing action.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T020742Z-5c4c00350493.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "75eab50a6dafe42116bd8c7d15bd150d1d463da306a8c46bf326de3eec83d434",
+  "created_at": "2026-10-05T02:07:42.507114+00:00"
+}

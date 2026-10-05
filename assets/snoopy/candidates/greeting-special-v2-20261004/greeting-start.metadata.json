@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE earlier lift-off frame of this same greeting arm. Change ONLY foreground arm (viewer right): lower the same paw to lower belly level, elbow less bent, forearm directed slightly down/right. Arm has just left hanging position. Keep SAME paw size and THREE rounded lobes with same two curved separators, rotate that paw as a whole, no redesign. Shoulder origin and upper arm thickness same. The distance between this new paw and reference paw should be only about one paw height, not a dramatic pose. Preserve all other pixels/shape/location: head, ear, face, collar, back arm, torso/rump/tail and planted legs/feet. Same square canvas, original scale, opaque white fill/thick black contours/red collar. True transparent alpha. No duplicate arm, additional objects, text, shadows, panels or motion lines.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024256Z-9156a9bad664.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024404Z-b6a7456460fc.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "10a752ac98421a37f1756429431a4d7131ea675c65151d6d27413a0b7f00ee51",
+  "created_at": "2026-10-05T02:44:04.761540+00:00"
+}

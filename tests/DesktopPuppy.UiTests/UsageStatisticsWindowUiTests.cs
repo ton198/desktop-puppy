@@ -161,10 +161,13 @@ public sealed class UsageStatisticsWindowUiTests
 
         var sessions = WaitForSessions(
             seed,
-            rows => rows.Count == 1 && rows[0].Id == seeded.CrossingId && rows[0].StartedAt == seeded.CutoffUtc,
+            rows => rows.All(row => row.Id != seeded.ExpiredId)
+                && rows.Any(row => row.Id == seeded.CrossingId && row.StartedAt == seeded.CutoffUtc),
             TimeSpan.FromSeconds(5));
 
-        var retained = Assert.Single(sessions);
+        // Initial foreground sampling may legitimately add unrelated current-day sessions.
+        // Retention owns the seeded IDs, not the total number of live database rows.
+        var retained = Assert.Single(sessions, session => session.Id == seeded.CrossingId);
         Assert.Equal(seeded.CrossingId, retained.Id);
         Assert.Equal(seeded.CutoffUtc, retained.StartedAt);
         Assert.DoesNotContain(sessions, session => session.Id == seeded.ExpiredId);

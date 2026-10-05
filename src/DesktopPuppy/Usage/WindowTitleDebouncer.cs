@@ -8,6 +8,8 @@ public sealed record WindowTitleInterval(
     DateTimeOffset StartedAt,
     DateTimeOffset? EndedAt)
 {
+    public DateTimeOffset? LastConfirmedAt { get; init; }
+
     public uint ProcessId => Snapshot.ProcessId;
 
     public string ProcessName => Snapshot.ProcessName;
@@ -17,11 +19,14 @@ public sealed record WindowTitleInterval(
 
 public sealed class WindowTitleDebouncer
 {
+    private static readonly TimeSpan CheckpointInterval = TimeSpan.FromSeconds(30);
     private readonly TimeSpan _stabilityWindow;
     private readonly Action<WindowTitleInterval> _onIntervalChanged;
     private ForegroundWindowSnapshot? _pendingSnapshot;
     private DateTimeOffset _pendingSince;
+    private DateTimeOffset _lastObservedAt;
     private WindowTitleInterval? _stableInterval;
+    private WindowTitleInterval? _pendingClosedInterval;
 
     public WindowTitleDebouncer(
         TimeSpan stabilityWindow,
@@ -40,6 +45,8 @@ public sealed class WindowTitleDebouncer
     public void OnTitleChanged(ForegroundWindowSnapshot snapshot, DateTimeOffset at)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+        FlushPendingClose();
+        _lastObservedAt = at;
 
         if (_stableInterval is not null && SnapshotsMatch(_stableInterval.Snapshot, snapshot))
         {
@@ -64,20 +71,37 @@ public sealed class WindowTitleDebouncer
     public void OnForegroundWindowLeft(DateTimeOffset at)
     {
         _pendingSnapshot = null;
+        FlushPendingClose();
         CloseStableInterval(at);
     }
 
     public void Advance(DateTimeOffset at)
     {
+        FlushPendingClose();
+        if (_stableInterval is { } stable)
+        {
+            var lastCheckpoint = stable.LastConfirmedAt ?? stable.StartedAt;
+            if (_lastObservedAt - lastCheckpoint >= CheckpointInterval)
+            {
+                var checkpoint = stable with { LastConfirmedAt = _lastObservedAt };
+                _onIntervalChanged(checkpoint);
+                _stableInterval = checkpoint;
+            }
+            return;
+        }
+
         if (_pendingSnapshot is null || at - _pendingSince < _stabilityWindow)
         {
             return;
         }
 
-        var snapshot = _pendingSnapshot;
+        var interval = new WindowTitleInterval(Guid.NewGuid(), _pendingSnapshot, _pendingSince, EndedAt: null)
+        {
+            LastConfirmedAt = _lastObservedAt
+        };
+        _onIntervalChanged(interval);
         _pendingSnapshot = null;
-        _stableInterval = new WindowTitleInterval(Guid.NewGuid(), snapshot, _pendingSince, EndedAt: null);
-        _onIntervalChanged(_stableInterval);
+        _stableInterval = interval;
     }
 
     private void CloseStableInterval(DateTimeOffset at)
@@ -87,9 +111,18 @@ public sealed class WindowTitleDebouncer
             return;
         }
 
-        var closed = _stableInterval with { EndedAt = at };
+        // Retire the live interval immediately, but keep the exact observed boundary until
+        // persistence succeeds. A later unlock of the same title must open a new interval.
+        _pendingClosedInterval = _stableInterval with { EndedAt = at, LastConfirmedAt = at };
         _stableInterval = null;
+        FlushPendingClose();
+    }
+
+    private void FlushPendingClose()
+    {
+        if (_pendingClosedInterval is not { } closed) return;
         _onIntervalChanged(closed);
+        _pendingClosedInterval = null;
     }
 
     private static bool SnapshotsMatch(

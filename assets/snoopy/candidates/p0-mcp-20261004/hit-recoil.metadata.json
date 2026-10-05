@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE gentle recoil animation keyframe of the exact reference puppy after a cartoon double-click flinch. Same identity, head shape, black ear, nose, tuft, red collar, thick black lines and opaque white fill. Dog leans back VERY slightly toward viewer's right, shoulders recoil a little, both paws lifted close to chest in a small defensive surprised gesture. Both feet remain planted on original baseline; no fall, no sitting, no dramatic tilt. Eyes squeezed shut, tiny rounded open gasp mouth. Keep full body, same size and square framing; maintain short legs and round belly. Clear shoulder connections, only two arms/two legs, simple rounded digits. True transparent alpha background. No injuries, tears, blood, person, weapon, impact effects, stars, floor, shadows, text, grid, watermark or sprite sheet.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021200Z-72334d71dabe.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "024abb5b4ef6873416ca1e2d3cb3fcd7c22e5ae50e7aadacb763b6baa99ca6ec",
+  "created_at": "2026-10-05T02:12:00.566533+00:00"
+}

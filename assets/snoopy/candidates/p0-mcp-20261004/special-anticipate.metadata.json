@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE anticipation facial keyframe for a playful tongue-out desktop pet gesture. Exact reference puppy, localized face change ONLY. Both eyes gently narrowed in a conspiratorial playful look, eyebrows slightly arched, closed mouth a small cheeky smile, tongue NOT visible yet. Distinct from tired or annoyed expression: cheerful mischief. Preserve original head/nose/ear/tuft silhouette, collar, all limbs, body, tail, feet, canvas scale and location. Black thick outlines, white opaque fill, red collar. Same full-body square framing. True transparent alpha outside character. No blush, props, words, watermark, shadow, ground, effects or panels. This is the preparatory frame before sticking tongue out.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021408Z-2342f532f582.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "74678d172b4c794d45e16fc8db6727190b8d13d262af1d8005b92abe957ac0c8",
+  "created_at": "2026-10-05T02:14:08.556613+00:00"
+}

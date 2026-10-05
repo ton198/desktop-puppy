@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE short-tongue intermediate frame. Edit ONLY the pink tongue from this reference, shorten its protruding length by HALF while retaining same width, same rounded tip, same mouth attachment and simple black outline. Keep the existing viewer RIGHT wink, other eye, eyebrows and whole smile line EXACTLY unchanged. This is the in-between frame from no tongue to reference full tongue, not a different expression. All other character pixels/head outline/nose/ear/collar/body/limbs/feet/scale/placement unchanged. Opaque white character with original black contours/red collar. True transparent alpha background. No effects, objects, text, shadow or panels. One full body on same square canvas.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021515Z-9a84380ba197.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024913Z-f215fd376353.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "d32f4c72b20f4e8fc615f2881be58615994e244ed25b1a9955c376052d472768",
+  "created_at": "2026-10-05T02:49:13.138796+00:00"
+}

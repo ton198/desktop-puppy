@@ -1,0 +1,57 @@
+[
+  {
+    "sequence": "drag",
+    "frames": 4,
+    "durations": [
+      900,
+      700,
+      120,
+      700
+    ]
+  },
+  {
+    "sequence": "greeting",
+    "frames": 7,
+    "durations": [
+      900,
+      100,
+      100,
+      450,
+      100,
+      100,
+      700
+    ]
+  },
+  {
+    "sequence": "click",
+    "frames": 4,
+    "durations": [
+      900,
+      550,
+      350,
+      700
+    ]
+  },
+  {
+    "sequence": "hit",
+    "frames": 5,
+    "durations": [
+      900,
+      90,
+      150,
+      650,
+      700
+    ]
+  },
+  {
+    "sequence": "special",
+    "frames": 5,
+    "durations": [
+      900,
+      150,
+      650,
+      350,
+      700
+    ]
+  }
+]

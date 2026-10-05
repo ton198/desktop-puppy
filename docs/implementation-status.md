@@ -2,8 +2,8 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-09-30
-**Latest verified step:** WinForms tray integration fast-forward-merged to `main` at `b1cfbda`; post-merge Release solution build succeeded with 0 errors and 5 warnings, and the full deterministic xUnit suite passed 193/193. TRAY-01–04 and real display hardware acceptance remain **Not run**.
+**Last updated:** 2026-10-01
+**Latest verified step:** Approved statistics-correctness fixes verified in the main working tree based on `ec1c241` (uncommitted): 212/212 deterministic tests, serialized Release solution build with 0 errors / 5 warnings, and 9/9 selected non-input-injecting UI tests including real-timer refresh. Full input-injecting UI and manual TRAY/OS/display acceptance remain **Not run**. See the 2026-10-01 section below.
 **Current phase:** Phase 4 in progress — usage statistics, native monitor/DPI placement, and the built-in WinForms tray are implemented; operator tray and hardware acceptance remain pending.
 **Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
 **Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
@@ -865,3 +865,27 @@ Fresh verification ran from the primary `main` worktree after the merge using .N
 - **Full deterministic unit suite:** 193 passed, 0 failed, 0 skipped.
 - **UI/active-desktop tests:** not run. The application was not launched for acceptance; Explorer was not restarted.
 - **TRAY-01–04:** remain **Not run — Manual required**, as detailed above. No real Explorer icon/menu behavior, hidden-window statistics, second-process restore/exit, or taskbar recreation is inferred from this build or unit suite.
+
+## Statistics correctness fixes and next acceptance stage — 2026-10-01
+
+Source identity: uncommitted working-tree changes on `main` based on `ec1c241`. Existing unrelated README/design/plan edits were preserved; no commit or push was made.
+
+- Added foreground sampling to the existing background advance, before title promotion; no-observation refreshes do not promote a pending title. Lock/suspend pause state is unchanged by polling.
+- Added an immediate startup foreground sample.
+- Added throttled 30-second last-confirmed title checkpoints and retryable non-fatal timer error handling. Failed closes retain their original observed boundary separately, so reopening the same title does not absorb lock/suspend downtime.
+- Added transactional legacy checkpoint-column migration and explicit single-instance-owner startup recovery before retention/collection. Observers can still initialize the store without sealing the owner's live titles.
+- Preserved retention-clipped title starts during subsequent checkpoint/close upserts.
+- Updated the UI retention assertion to check seeded IDs rather than incorrectly assume no real foreground sessions are collected at startup.
+
+Fresh verification:
+
+- **Release solution build:** exit 0, 0 errors, 5 warnings (3 cached NU1900 vulnerability-source warnings, 2 WFO0003 DPI-manifest warnings).
+- **Complete deterministic unit suite:** 212 passed, 0 failed, 0 skipped (19 additional cases versus 193).
+- **Separate UI-project build:** exit 0, 0 errors, 1 NU1900 warning.
+- **Selected desktop UI suite:** 9 passed, 0 failed, 0 skipped in 23 seconds (final rerun), filtered to `DesktopPuppyWindowUiTests`, `UsageStatisticsWindowUiTests`, and `Category=LongRunningE2E`. Test databases were isolated; no mouse/keyboard injection or system transition occurred. This is not the full `Category=Ui` suite.
+- The initial selected UI run had one outdated total-row-count assertion failure; after correcting that test to target the seed IDs, all nine selected cases passed.
+
+Limits: checkpoints recover confirmed title detail only. An abrupt termination can still lose the unclosed foreground application session; do not claim at-most-30-second loss for total application usage. Scheduling, unavailable observations, and failed writes can increase title loss. Synchronous startup/shutdown SQLite remains a separate technical-debt item.
+
+Evidence and commands: `docs/verification/2026-10-01-statistics-correctness.md`.
+Next ordered operator steps: `docs/verification/windows-acceptance-checklist.md`. **TRAY-01–04, actual lock/unlock/suspend/resume, E2E-DISPLAY-01–02, and complete input-injecting UI regression remain Not run.** The next stage requires the operator's real Shell/OS/hardware actions; neither unit nor selected UI results substitutes for them.

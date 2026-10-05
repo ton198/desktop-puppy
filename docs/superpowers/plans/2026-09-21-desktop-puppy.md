@@ -1,620 +1,1112 @@
 # Desktop Puppy Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a personal Windows desktop puppy that is a mischievous always-on-top companion with local usage statistics, daily humorous reports, optional DeepSeek-generated dialogue, and strict low-power behavior.
+**Goal:** Build a personal Windows desktop puppy with local usage statistics, persistent mischievous interactions, AI-generated content selected by Jev, 18:20 daily reports, and bounded resource usage.
 
-**Architecture:** Use one C# WPF process. WPF owns UI and animation surfaces; focused Win32 PInvoke adapters own transparent-window behavior and foreground/fullscreen events; SQLite stores local usage and content history; a local behavior engine decides when the puppy acts; DeepSeek only generates or rewrites candidate lines inside a validated scene and never controls behavior.
+**Architecture:** Use one C# WPF process. WPF owns windows, animations, bubbles, settings and report presentation. Focused Win32 adapters own native window behavior, foreground events, monitor/fullscreen detection, tray and startup. SQLite stores local usage, title intervals, content history, request outcomes and encrypted API-key blobs. DeepSeek generates candidate text; Jev (`jev-latest`) selects among locally validated candidates; local behavior and hard validation remain authoritative.
 
-**Tech Stack:** C#, current .NET LTS, WPF, Win32 PInvoke, SQLite, PNG sprite frames, HttpClient, Windows protected local storage, System.Text.Json, and xUnit.
+**Tech Stack:** `net10.0-windows`, WPF, Win32 P/Invoke, `Microsoft.Data.Sqlite`, `HttpClient`, Windows DPAPI, `System.Text.Json`, PNG animation frames, xUnit, and a single-process composition root.
 
-**Spec:** docs/superpowers/specs/2026-09-21-desktop-puppy-design.md
+**Spec:** `docs/superpowers/specs/2026-09-21-desktop-puppy-design.md`
 
 ## Global Constraints
 
-- The application is for personal, non-commercial use.
-- Do not use Electron, Tauri, WebView, HTML, CSS, or JavaScript as the UI technology.
-- The default personality is mischievous and teasing, with occasional genuine concern.
-- Use hybrid AI mode: local content for high-frequency reactions; DeepSeek for selected greetings, important activities, and daily reports.
-- DeepSeek is the first provider and deepseek-flash is the default model.
-- The behavior engine, cooldowns, schedules, and animation choices remain local and deterministic.
-- The AI provider must never block the WPF UI thread.
-- If the API key is absent or any network/content validation step fails, fall back to local content without an error modal.
-- Do not collect keystrokes, mouse trajectories, screenshots, document contents, browser page bodies, or clipboard contents.
-- Store usage and content history locally; do not add a project-owned cloud backend.
-- Do not write production code until a corresponding failing test has been written and observed.
-- Keep rendering event-driven: no continuous high-FPS loop while idle.
-- Never put API keys in source control, logs, ordinary plaintext settings, or test fixtures.
-
-## Confirmed requirements and decisions
-
-### Product behavior
-
-- Personality: B, mischievous/troll-like.
-- The puppy can initiate low-frequency activities, tease the user, and react to desktop usage.
-- The puppy must remain configurable and must not become continuously disruptive.
-- Required interactions include transparent desktop presence, click/drag/hover, hit reaction, daily greeting, random activities, local background statistics, and daily humorous reporting.
-
-### AI behavior
-
-- AI mode: B, hybrid.
-- Local hand-written lines handle frequent click, hit, and basic reactions.
-- DeepSeek handles selected greetings, important activities, user-requested extra lines, and daily reports.
-- AI does not decide when a behavior occurs.
-- Candidate generation returns multiple options; local validators select one.
-- Persona rules, prohibited phrases, normalized text, n-gram similarity, recent history, and style cooldowns reduce AI-like repetition.
-- Daily report numbers and facts are calculated locally; the model can only turn those facts into prose.
-- Missing key, timeout, invalid JSON, request limit, provider error, or rejected content must degrade to local content.
-
-### Technology
-
-- C# with the current .NET LTS.
-- WPF for all UI.
-- Win32 PInvoke for window styles, transparent/always-on-top behavior, foreground events, fullscreen detection, tray, work areas, startup, and click-through behavior.
-- SQLite for local persistence.
-- PNG sprite frames or independent PNG frames for animation.
-- One process for the first phase; no Windows Service.
+- Target `net10.0-windows`; support Windows 10 22H2 and later; x64 is the first supported architecture.
+- The UI uses WPF only; do not add Electron, Tauri, WebView, HTML, CSS or JavaScript.
+- The application is single-instance and single-process for the first phase.
+- Local behavior decides when an activity occurs; AI only generates or selects content.
+- There is no daily activity cap and no daily AI cap, but each activity and request still has cooldown, timeout, retry and cancellation rules.
+- DeepSeek generates six candidates per request; the candidate-pool builder calls DeepSeek serially and stops when at least four locally valid candidates exist; it makes at most five requests per scene.
+- Jev uses the official TypeSafe API and model `jev-latest`; it receives all valid candidates and only returns a selection result.
+- DeepSeek and Jev requests may run concurrently across independent scenes; no global AI queue or concurrency limiter is introduced.
+- DeepSeek and Jev API keys are independently encrypted with Windows DPAPI before being stored in SQLite; plaintext keys never enter logs, prompts, ordinary settings or tests.
+- A failed AI scene never uses a local fallback line; after five failed attempts it records the failure and shows a non-blocking notification.
+- All operational history is retained for at most 15 local days; settings and encrypted API-key blobs are not part of rolling history cleanup.
+- Window-title records require two seconds of stability; titles that change or disappear before two seconds are discarded.
+- Fullscreen hides all pet windows and pauses new random activity, but usage and title collection continue; in-flight AI requests are not cancelled.
+- Lock, sleep and hibernate close foreground sessions; unlocking starts a new session.
+- No network or SQLite work runs on the WPF Dispatcher thread.
+- Production code is written only after a corresponding failing test has been run and observed.
+- Idle rendering is event-driven; animation timers run only while a finite clip is active.
 
 ---
 
-## Task 1: Repository and WPF application skeleton
+## Task 1: Repository, SDK configuration and WPF skeleton
 
 **Files:**
-- Create: DesktopPuppy.sln
-- Create: src/DesktopPuppy/DesktopPuppy.csproj
-- Create: src/DesktopPuppy/App.xaml
-- Create: src/DesktopPuppy/App.xaml.cs
-- Create: src/DesktopPuppy/MainWindow.xaml
-- Create: src/DesktopPuppy/MainWindow.xaml.cs
-- Create: tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
-- Create: tests/DesktopPuppy.Tests/SmokeTests.cs
-- Modify: .gitignore
-- Modify: README.md
+- Create: `DesktopPuppy.sln`
+- Create: `src/DesktopPuppy/DesktopPuppy.csproj`
+- Create: `src/DesktopPuppy/App.xaml`
+- Create: `src/DesktopPuppy/App.xaml.cs`
+- Create: `src/DesktopPuppy/ApplicationInfo.cs`
+- Create: `src/DesktopPuppy/MainWindow.xaml`
+- Create: `src/DesktopPuppy/MainWindow.xaml.cs`
+- Create: `tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj`
+- Create: `tests/DesktopPuppy.Tests/SmokeTests.cs`
+- Create: `Directory.Build.props`
+- Modify: `.gitignore`
+- Modify: `README.md`
 
 **Interfaces:**
-- ApplicationInfo.ProductName is a public constant with value Desktop Puppy.
-- The WPF project targets Windows and enables nullable reference types.
-- The test project can run without launching a WPF window.
+- `ApplicationInfo.ProductName` is a public constant with value `Desktop Puppy`.
+- The application targets `net10.0-windows` and enables WPF and nullable reference types.
+- The test project references the application assembly and can run without showing a WPF window.
+- `Directory.Build.props` enables deterministic builds, nullable warnings and Windows targeting settings shared by projects.
 
-- [ ] Step 1: Write the failing smoke test.
+- [ ] **Step 1: Verify the SDK prerequisite.**
 
-Create a test that references the application assembly and asserts ApplicationInfo.ProductName equals Desktop Puppy. The type does not exist yet, so the test must fail because the symbol is missing.
-
-- [ ] Step 2: Run RED.
+Install the .NET 10 SDK before running this task. The current review environment does not have `dotnet` on `PATH`, so do not treat missing-command output as a product test failure.
 
 Run:
-~~~text
-dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --no-restore
-~~~
-Expected: FAIL because ApplicationInfo is not defined.
 
-- [ ] Step 3: Create the minimal WPF solution and implementation.
+```text
+dotnet --info
+```
 
-Create the Windows-targeted WPF project, define ApplicationInfo.ProductName, and keep MainWindow as a minimal borderless placeholder. Do not add product behavior in this task.
+Expected: the .NET 10 SDK is listed and the command exits successfully.
 
-- [ ] Step 4: Run GREEN.
+- [ ] **Step 2: Write the failing smoke test.**
 
-Run the focused test and then the complete test project. Expected: all tests pass with no warnings introduced by the new project.
+Create `SmokeTests.cs` with this assertion:
 
-- [ ] Step 5: Commit.
+```csharp
+[Fact]
+public void ProductName_is_desktop_puppy()
+{
+    Assert.Equal("Desktop Puppy", ApplicationInfo.ProductName);
+}
+```
 
-~~~text
-git add DesktopPuppy.sln src tests .gitignore README.md
+At this point `ApplicationInfo` does not exist.
+
+- [ ] **Step 3: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+Expected: compilation fails because `ApplicationInfo.ProductName` is not defined.
+
+- [ ] **Step 4: Create the minimal WPF solution.**
+
+Add the Windows-targeted project, `ApplicationInfo`, `App.xaml`, and a borderless placeholder `MainWindow`. Do not add native hooks, statistics, AI or product behavior.
+
+- [ ] **Step 5: Run GREEN.**
+
+```text
+dotnet build --configuration Release
+dotnet test --configuration Release --no-restore
+```
+
+Expected: the build and smoke test pass with no new warnings.
+
+- [ ] **Step 6: Commit the skeleton.**
+
+```text
+git add DesktopPuppy.sln src tests Directory.Build.props .gitignore README.md
 git commit -m "chore: scaffold WPF desktop puppy"
-~~~
+```
 
-## Task 2: Domain events, settings, and clock abstractions
+## Task 2: Core contracts, settings, clocks and scene descriptions
 
 **Files:**
-- Create: src/DesktopPuppy/Core/Clock/IClock.cs
-- Create: src/DesktopPuppy/Core/Clock/SystemClock.cs
-- Create: src/DesktopPuppy/Core/Events/PuppyEvent.cs
-- Create: src/DesktopPuppy/Core/Events/PuppyEventType.cs
-- Create: src/DesktopPuppy/Core/Settings/AppSettings.cs
-- Create: src/DesktopPuppy/Core/Settings/ActivitySettings.cs
-- Create: src/DesktopPuppy/Core/Settings/AiSettings.cs
-- Create: tests/DesktopPuppy.Tests/Core/SettingsTests.cs
+- Create: `src/DesktopPuppy/Core/Clock/IClock.cs`
+- Create: `src/DesktopPuppy/Core/Clock/SystemClock.cs`
+- Create: `src/DesktopPuppy/Core/Events/PuppyEvent.cs`
+- Create: `src/DesktopPuppy/Core/Events/PuppyEventType.cs`
+- Create: `src/DesktopPuppy/Core/Settings/AppSettings.cs`
+- Create: `src/DesktopPuppy/Core/Settings/ActivitySettings.cs`
+- Create: `src/DesktopPuppy/Core/Settings/AiSettings.cs`
+- Create: `src/DesktopPuppy/Core/Content/SceneCard.cs`
+- Create: `src/DesktopPuppy/Core/Content/ContentCandidate.cs`
+- Create: `src/DesktopPuppy/Core/Content/ContentValidationProfile.cs`
+- Create: `src/DesktopPuppy/Core/Requests/AiRequestId.cs`
+- Create: `tests/DesktopPuppy.Tests/Core/SettingsTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Core/SceneCardTests.cs`
 
 **Interfaces:**
-- IClock.UtcNow returns DateTimeOffset.
-- PuppyEvent contains PuppyEventType Type, DateTimeOffset OccurredAt, and a read-only context dictionary.
-- AppSettings contains local behavior, statistics, sound, fullscreen, and AI options.
-- AiSettings contains Enabled, Provider, Model, DailyRequestLimit, and QuietHoursEnabled; it does not contain the plaintext API key.
+- `IClock.UtcNow` returns `DateTimeOffset`.
+- `PuppyEvent` contains a `PuppyEventType`, `DateTimeOffset OccurredAt`, and an immutable context dictionary.
+- `AppSettings` includes activity, statistics, sound, fullscreen, startup, interaction and AI settings.
+- `ActivitySettings` defaults to a 20-minute global cooldown, no daily maximum, 23:00-08:00 quiet hours and enabled fullscreen suppression.
+- `AiSettings` contains provider flags, DeepSeek model, Jev model `jev-latest`, per-scene timeouts, five-attempt retry policy and no daily request limit; it never contains plaintext API keys.
+- `SceneCard` carries event type, application name, window title, time segment, humor style, validation profile and compact history summary.
+- `ContentCandidate` contains text, source request ID, scene ID and local validation metadata.
 
-- [ ] Step 1: Write failing settings tests.
+- [ ] **Step 1: Write failing tests for defaults and clock injection.**
 
-Test that defaults select hybrid AI mode, provider DeepSeek, model deepseek-flash, local statistics enabled, sounds disabled, and the proposed quiet-hours default. Test that a fixed clock can replace the system clock.
+Cover these exact defaults:
 
-- [ ] Step 2: Run RED.
+```csharp
+Assert.Equal(TimeSpan.FromMinutes(20), settings.Activity.GlobalCooldown);
+Assert.Null(settings.Activity.DailyMaximum);
+Assert.Equal(new TimeOnly(23, 0), settings.Activity.QuietHoursStart);
+Assert.Equal(new TimeOnly(8, 0), settings.Activity.QuietHoursEnd);
+Assert.Equal("deepseek-flash", settings.Ai.DeepSeekModel);
+Assert.Equal("jev-latest", settings.Ai.JevModel);
+Assert.Equal(5, settings.Ai.MaxAttempts);
+Assert.Null(settings.Ai.DailyRequestLimit);
+```
 
-Run:
-~~~text
-dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~SettingsTests
-~~~
-Expected: FAIL because the settings and clock types are missing.
+Also verify a fake clock controls `UtcNow` without touching system time.
 
-- [ ] Step 3: Implement the minimal domain types.
+- [ ] **Step 2: Run RED.**
 
-Use immutable records or classes with explicit defaults from the spec. Keep API-key storage out of plain settings objects.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Core
+```
 
-- [ ] Step 4: Run GREEN.
+Expected: compilation fails because the core types are missing.
 
-Run the focused tests and all tests. Expected: all tests pass.
+- [ ] **Step 3: Implement immutable core types.**
 
-- [ ] Step 5: Commit.
+Use records or immutable classes with explicit defaults. Represent the absence of a daily maximum as `null`, not as a large sentinel number. Keep API keys outside all settings records.
 
-~~~text
+- [ ] **Step 4: Run GREEN.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Core
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+- [ ] **Step 5: Commit.**
+
+```text
 git add src/DesktopPuppy/Core tests/DesktopPuppy.Tests/Core
-git commit -m "feat: add puppy domain settings and events"
-~~~
+git commit -m "feat: add core settings and scene contracts"
+```
 
-## Task 3: Local SQLite storage and migrations
+## Task 3: SQLite schema, migrations, retention and repositories
 
 **Files:**
-- Create: src/DesktopPuppy/Storage/DatabaseConnectionFactory.cs
-- Create: src/DesktopPuppy/Storage/DatabaseMigrator.cs
-- Create: src/DesktopPuppy/Storage/Repositories/UsageRepository.cs
-- Create: src/DesktopPuppy/Storage/Repositories/ContentHistoryRepository.cs
-- Create: src/DesktopPuppy/Storage/Repositories/InteractionRepository.cs
-- Create: src/DesktopPuppy/Storage/Models/UsageSessionRecord.cs
-- Create: src/DesktopPuppy/Storage/Models/ContentHistoryRecord.cs
-- Create: src/DesktopPuppy/Storage/Models/InteractionRecord.cs
-- Create: tests/DesktopPuppy.Tests/Storage/DatabaseMigratorTests.cs
-- Create: tests/DesktopPuppy.Tests/Storage/RepositoryTests.cs
+- Create: `src/DesktopPuppy/Storage/DatabaseConnectionFactory.cs`
+- Create: `src/DesktopPuppy/Storage/DatabaseMigrator.cs`
+- Create: `src/DesktopPuppy/Storage/RetentionService.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/UsageRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/WindowTitleRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/InteractionRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/ContentHistoryRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/AiRequestRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/DailyReportRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/SettingsRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Repositories/ApiKeyBlobRepository.cs`
+- Create: `src/DesktopPuppy/Storage/Models/UsageSessionRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/WindowTitleIntervalRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/InteractionRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/ContentHistoryRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/AiRequestRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/DailyReportRecord.cs`
+- Create: `src/DesktopPuppy/Storage/Models/EncryptedApiKeyBlob.cs`
+- Create: `tests/DesktopPuppy.Tests/Storage/DatabaseMigratorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Storage/RepositoryTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Storage/RetentionServiceTests.cs`
 
 **Interfaces:**
-- DatabaseMigrator.Migrate(connection) creates schema version 1.
-- UsageRepository.AppendSession(record) persists a closed foreground session.
-- ContentHistoryRepository.Add(record) and GetRecent(since) support duplicate prevention.
-- InteractionRepository.Add(record) persists hits, clicks, activities, and AI outcomes.
+- `DatabaseConnectionFactory.Open()` opens `%LOCALAPPDATA%\DesktopPuppy\desktop-puppy.db` with foreign keys enabled.
+- `DatabaseMigrator.Migrate(connection)` creates and upgrades schema versions transactionally.
+- `UsageRepository.AppendSession(UsageSessionRecord)` persists closed foreground sessions.
+- `WindowTitleRepository.AppendStableInterval(WindowTitleIntervalRecord)` persists titles stable for two seconds.
+- `ContentHistoryRepository.AddDisplayed(ContentHistoryRecord)` records only displayed content for duplicate prevention; candidate history is stored separately.
+- `AiRequestRepository.AddOrUpdate(AiRequestRecord)` stores provider, model, attempt, outcome, display state and redacted error kind, never credentials.
+- `DailyReportRepository.Upsert(DailyReportRecord)` keeps one status record per local report date.
+- `RetentionService.DeleteBefore(localDateExclusive)` deletes all operational history older than 15 local days in one transaction while preserving settings and encrypted key blobs.
+- `SettingsRepository` stores ordinary settings without secrets.
+- `ApiKeyBlobRepository` stores provider-specific DPAPI ciphertext and metadata only.
 
-- [ ] Step 1: Write failing migration and repository tests.
+Schema version 1 includes:
 
-Use a temporary SQLite database. Assert that migration creates schema_version, usage_sessions, content_history, and interactions. Assert that a usage session can be inserted and read back with the same application name, start, end, and duration.
+```text
+schema_version
+app_settings
+api_key_blobs
+usage_sessions
+window_title_intervals
+interactions
+content_candidates
+content_history
+ai_requests
+daily_reports
+```
 
-- [ ] Step 2: Run RED.
+All persisted instants use UTC. Local report dates and local-day cutoffs are stored explicitly so DST and timezone changes do not change historical report identity.
 
-Run:
-~~~text
+- [ ] **Step 1: Write failing migration tests.**
+
+Assert that migration creates every table above, creates indexes on UTC timestamps and local report date, and can be run twice without changing data.
+
+- [ ] **Step 2: Write failing repository and retention tests.**
+
+Cover:
+
+```text
+usage session round-trip with application, title, start, end and duration
+stable title interval round-trip
+content candidate stored without becoming displayed history
+AI request stores provider/model/attempt/status without key text
+one daily report row per local date
+retention deletes records older than 15 local days
+retention preserves settings and encrypted key blobs
+clear-history deletes operational history but not settings
+```
+
+- [ ] **Step 3: Run RED.**
+
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Storage
-~~~
-Expected: FAIL because the database types and schema do not exist.
+```
 
-- [ ] Step 3: Implement minimal SQLite storage.
+Expected: compilation or schema failures.
 
-Use parameterized SQL only. Add indexes for usage date and content-history timestamp. Keep writes explicit so later batching can wrap multiple inserts in one transaction.
+- [ ] **Step 4: Implement parameterized SQLite access.**
 
-- [ ] Step 4: Run GREEN.
+Use parameterized SQL only. Use UTC timestamps for instant columns, explicit local dates for daily records, indexes for retention and report lookup, and a transaction for each retention/delete operation. Never put a key into exception text or test output.
 
-Run focused storage tests and all tests. Expected: no database files are created inside the repository.
+- [ ] **Step 5: Run GREEN.**
 
-- [ ] Step 5: Commit.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Storage
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
 
-~~~text
+Verify no database file is created inside the repository.
+
+- [ ] **Step 6: Commit.**
+
+```text
 git add src/DesktopPuppy/Storage tests/DesktopPuppy.Tests/Storage
-git commit -m "feat: add local sqlite storage"
-~~~
+git commit -m "feat: add sqlite schema retention and repositories"
+```
 
-## Task 4: Native Windows integration
+## Task 4: Native Windows boundaries and single-instance startup
 
 **Files:**
-- Create: src/DesktopPuppy/Native/INativeWindowService.cs
-- Create: src/DesktopPuppy/Native/Win32WindowService.cs
-- Create: src/DesktopPuppy/Native/IForegroundWindowWatcher.cs
-- Create: src/DesktopPuppy/Native/WinEventForegroundWatcher.cs
-- Create: src/DesktopPuppy/Native/IFullscreenDetector.cs
-- Create: src/DesktopPuppy/Native/Win32FullscreenDetector.cs
-- Create: src/DesktopPuppy/Native/SystemTrayService.cs
-- Create: src/DesktopPuppy/Native/StartupRegistrationService.cs
-- Create: tests/DesktopPuppy.Tests/Native/FullscreenDetectorTests.cs
-- Create: tests/DesktopPuppy.Tests/Native/ForegroundSessionTests.cs
+- Create: `src/DesktopPuppy/Native/INativeWindowService.cs`
+- Create: `src/DesktopPuppy/Native/Win32WindowService.cs`
+- Create: `src/DesktopPuppy/Native/IForegroundWindowWatcher.cs`
+- Create: `src/DesktopPuppy/Native/WinEventForegroundWatcher.cs`
+- Create: `src/DesktopPuppy/Native/IFullscreenDetector.cs`
+- Create: `src/DesktopPuppy/Native/Win32FullscreenDetector.cs`
+- Create: `src/DesktopPuppy/Native/IMonitorService.cs`
+- Create: `src/DesktopPuppy/Native/Win32MonitorService.cs`
+- Create: `src/DesktopPuppy/Native/ISystemTrayService.cs`
+- Create: `src/DesktopPuppy/Native/SystemTrayService.cs`
+- Create: `src/DesktopPuppy/Native/IStartupRegistrationService.cs`
+- Create: `src/DesktopPuppy/Native/RegistryStartupRegistrationService.cs`
+- Create: `src/DesktopPuppy/Native/ISingleInstanceGuard.cs`
+- Create: `src/DesktopPuppy/Native/SingleInstanceGuard.cs`
+- Create: `tests/DesktopPuppy.Tests/Native/FullscreenDetectorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Native/MonitorPlacementTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Native/StartupRegistrationTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Native/SingleInstanceTests.cs`
 
 **Interfaces:**
-- INativeWindowService.ConfigurePetWindow(window, options) applies borderless, transparency, topmost, hit-test, and work-area behavior.
-- IForegroundWindowWatcher.Start(callback) and Stop() manage native foreground events.
-- IFullscreenDetector.IsFullscreen(window) returns whether a foreground application occupies the active monitor.
+- `INativeWindowService.ConfigurePetWindow(Window, PetWindowOptions)` applies borderless, transparent, topmost and hit-test behavior.
+- `IForegroundWindowWatcher.Start(Action<ForegroundWindowSnapshot>)` and `Stop()` manage native foreground events and release hook handles/delegates.
+- `IFullscreenDetector.IsFullscreen(ForegroundWindowSnapshot, MonitorInfo)` recognizes exclusive fullscreen and borderless windows covering the monitor, but not ordinary maximized windows.
+- `IMonitorService.GetWorkAreas()` returns monitor identity, bounds, work area and DPI scale.
+- `ISystemTrayService` creates immediate tray UI and exposes show/hide, pause/resume, settings, today report, clear history and exit commands.
+- `IStartupRegistrationService.SetEnabled(bool)` uses `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` and the `--startup` argument.
+- `ISingleInstanceGuard.TryAcquire(Action activateExisting)` prevents duplicate processes and activates the existing instance on a second launch.
 
-- [ ] Step 1: Write failing tests for session transitions and fullscreen decisions.
+- [ ] **Step 1: Write failing pure geometry and policy tests.**
 
-Test a pure ForegroundSessionTracker helper with a fake clock: starting an application creates an open session, changing applications closes the previous session, and a duplicate foreground event does not create a zero-length extra session. Test fullscreen decision logic with supplied monitor rectangles rather than requiring a real desktop in unit tests.
+Test that:
 
-- [ ] Step 2: Run RED.
+```text
+exclusive fullscreen is true
+borderless monitor-sized window is true
+ordinary maximized work-area window is false
+any fullscreen monitor suppresses all pet windows
+pet position is clamped with at least 20 logical pixels visible
+missing saved monitor falls back to primary monitor
+startup registration writes/removes only the app-owned value
+second-instance activation does not create a second guard
+```
 
-Run:
-~~~text
+- [ ] **Step 2: Run RED.**
+
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Native
-~~~
-Expected: FAIL because the tracker and native abstractions are not defined.
+```
 
-- [ ] Step 3: Implement the pure tracker and Win32 adapters.
+- [ ] **Step 3: Implement native adapters.**
 
-Use Win32 event hooks for foreground changes with a low-frequency fallback timer. Ensure hook handles and delegates are released on Stop. Keep PInvoke declarations at the native boundary; do not spread raw calls across UI code.
+Keep P/Invoke declarations inside `Native`. Use WinEvent foreground hooks with an explicit message-pump lifetime, keep delegates rooted until `Stop`, and release hooks deterministically. Use monitor work areas and DPI-aware coordinates for placement. Use a per-user registry Run value and no elevation.
 
-- [ ] Step 4: Run GREEN and perform a manual native check.
+- [ ] **Step 4: Run GREEN and perform manual native checks.**
 
-Run focused and complete tests. Manually launch the WPF shell and verify that a foreground-change callback fires when switching between two applications.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Native
+```
 
-- [ ] Step 5: Commit.
+Manually verify foreground callbacks, fullscreen detection, monitor removal, startup registration, tray commands and second-launch activation.
 
-~~~text
+- [ ] **Step 5: Commit.**
+
+```text
 git add src/DesktopPuppy/Native tests/DesktopPuppy.Tests/Native
-git commit -m "feat: add native windows integration boundaries"
-~~~
+git commit -m "feat: add native window monitor and startup boundaries"
+```
 
-## Task 5: Pet window, animation state machine, and interactions
-
-**Files:**
-- Create: src/DesktopPuppy/Pet/PetWindow.xaml
-- Create: src/DesktopPuppy/Pet/PetWindow.xaml.cs
-- Create: src/DesktopPuppy/Pet/Animation/AnimationClip.cs
-- Create: src/DesktopPuppy/Pet/Animation/AnimationState.cs
-- Create: src/DesktopPuppy/Pet/Animation/AnimationController.cs
-- Create: src/DesktopPuppy/Pet/Interaction/InteractionController.cs
-- Create: src/DesktopPuppy/Pet/Interaction/HitReactionService.cs
-- Create: src/DesktopPuppy/Pet/Interaction/PetInteractionEvent.cs
-- Create: tests/DesktopPuppy.Tests/Pet/AnimationControllerTests.cs
-- Create: tests/DesktopPuppy.Tests/Pet/HitReactionServiceTests.cs
-- Create: assets/pet/.gitkeep
-
-**Interfaces:**
-- AnimationController.Play(clip) starts a finite clip and raises Completed.
-- AnimationController.SetIdle(state) selects the idle state without a permanent high-FPS loop.
-- HitReactionService.RegisterHit(occurredAt) returns whether a reaction is allowed after cooldown.
-- InteractionController publishes click, double-click, hover, drag, and hit events.
-
-- [ ] Step 1: Write failing animation and hit-cooldown tests.
-
-Test that a hit is accepted when no recent hit exists, rejected during cooldown, and accepted after cooldown. Test that the controller transitions idle -> hit -> idle after the clip duration.
-
-- [ ] Step 2: Run RED.
-
-Run:
-~~~text
-dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Pet
-~~~
-Expected: FAIL because the animation and hit services do not exist.
-
-- [ ] Step 3: Implement the state machine and WPF rendering surface.
-
-Use image-frame swapping or WriteableBitmap updates. Start a dispatcher timer only while an animation clip is active; stop it on completion. Configure the pet window through the native adapter. Do not add blur or heavy effects.
-
-- [ ] Step 4: Run GREEN and perform a manual animation check.
-
-Run focused and complete tests. Manually verify drag, hit, idle-to-hit-to-idle, and multi-monitor positioning.
-
-- [ ] Step 5: Commit.
-
-~~~text
-git add src/DesktopPuppy/Pet assets/pet tests/DesktopPuppy.Tests/Pet
-git commit -m "feat: add pet window animation and hit reactions"
-~~~
-
-## Task 6: Local content library, persona rules, and duplicate prevention
+## Task 5: Foreground usage collection and title debounce
 
 **Files:**
-- Create: src/DesktopPuppy/Content/PersonaProfile.cs
-- Create: src/DesktopPuppy/Content/SceneCard.cs
-- Create: src/DesktopPuppy/Content/LocalPhraseBank.cs
-- Create: src/DesktopPuppy/Content/ContentCandidate.cs
-- Create: src/DesktopPuppy/Content/ContentValidator.cs
-- Create: src/DesktopPuppy/Content/ContentSelector.cs
-- Create: src/DesktopPuppy/Content/Similarity/NormalizedText.cs
-- Create: src/DesktopPuppy/Content/Similarity/NgramSimilarity.cs
-- Create: src/DesktopPuppy/Content/Phrases/seed-phrases.json
-- Create: tests/DesktopPuppy.Tests/Content/ContentValidatorTests.cs
-- Create: tests/DesktopPuppy.Tests/Content/ContentSelectorTests.cs
-- Create: tests/DesktopPuppy.Tests/Content/NgramSimilarityTests.cs
+- Create: `src/DesktopPuppy/Usage/ForegroundSessionTracker.cs`
+- Create: `src/DesktopPuppy/Usage/UsageCollector.cs`
+- Create: `src/DesktopPuppy/Usage/WindowTitleDebouncer.cs`
+- Create: `src/DesktopPuppy/Usage/ApplicationClassifier.cs`
+- Create: `src/DesktopPuppy/Usage/DailyUsageAggregator.cs`
+- Create: `tests/DesktopPuppy.Tests/Usage/ForegroundSessionTrackerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Usage/WindowTitleDebouncerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Usage/DailyUsageAggregatorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Usage/ApplicationClassifierTests.cs`
 
 **Interfaces:**
-- SceneCard carries event type, application context, time context, mood, humor style, maximum length, and allowed facts.
-- ContentValidator.Validate(candidate, scene, recent) returns a validation result with reasons.
-- ContentSelector.Select(candidates, scene, recent) returns the best accepted candidate or null.
+- `ForegroundSessionTracker.OnForegroundApplicationChanged(ForegroundWindowSnapshot snapshot, DateTimeOffset at)` closes the previous session and opens the next one immediately.
+- `ForegroundSessionTracker.OnSessionBoundary(SessionBoundary boundary, DateTimeOffset at)` closes sessions for lock, sleep, hibernate and shutdown.
+- `WindowTitleDebouncer.OnTitleChanged(snapshot, at)` emits an interval only after the title is stable for two seconds; it emits nothing for a title abandoned earlier.
+- `UsageCollector` connects the native watcher, fullscreen detector, title debouncer and repository.
+- `DailyUsageAggregator.Build(localDate, sessions, interactions)` returns immutable facts for report planning.
+- `ApplicationClassifier.Classify(processName)` returns Work, Entertainment, Utility, Communication, Development or Unknown using local rules and user overrides.
 
-- [ ] Step 1: Write failing validator tests.
+- [ ] **Step 1: Write failing tracker tests.**
 
-Cover empty text, prohibited AI phrases, Markdown/multi-paragraph output, unsupported facts, exact duplicates, high n-gram similarity, and acceptance of a short concrete mischievous line.
+Cover:
 
-- [ ] Step 2: Run RED.
+```text
+first foreground event opens a session
+changing application closes the prior session immediately
+same foreground event is ignored
+lock closes the session
+sleep closes the session
+unlock starts a new session
+shutdown closes the open session
+Desktop Puppy itself is excluded from usage totals
+```
 
-Run:
-~~~text
-dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Content
-~~~
-Expected: FAIL because the validator and selector are not defined.
+- [ ] **Step 2: Write failing title debounce tests.**
 
-- [ ] Step 3: Implement the local content pipeline.
+Cover:
 
-Add persona rules, prohibited phrases, text normalization, n-gram threshold, recent-style tracking, and hand-written seed phrases. The validator only accepts or rejects; it never silently rewrites a candidate.
+```text
+title stable for 2 seconds emits one interval
+title changes before 2 seconds emit nothing
+same title does not emit duplicate intervals
+leaving a window before 2 seconds discards the pending title
+new title closes the previous interval
+```
 
-- [ ] Step 4: Run GREEN.
+- [ ] **Step 3: Write failing aggregation tests.**
 
-Run focused and complete tests. Use a fixed random seed in selector tests so they are deterministic.
+Cover foreground duration, application totals, switch count, longest session, work/entertainment ratio, deep-night usage, title examples and interactions. Treat foreground time as active time without an idle threshold. Split sessions at local midnight for reports.
 
-- [ ] Step 5: Commit.
+- [ ] **Step 4: Run RED.**
 
-~~~text
-git add src/DesktopPuppy/Content tests/DesktopPuppy.Tests/Content
-git commit -m "feat: add local persona content pipeline"
-~~~
-
-## Task 7: DeepSeek provider and secure API-key settings
-
-**Files:**
-- Create: src/DesktopPuppy/Ai/IAiContentProvider.cs
-- Create: src/DesktopPuppy/Ai/DeepSeek/DeepSeekContentProvider.cs
-- Create: src/DesktopPuppy/Ai/DeepSeek/DeepSeekRequest.cs
-- Create: src/DesktopPuppy/Ai/DeepSeek/DeepSeekResponse.cs
-- Create: src/DesktopPuppy/Ai/AiContentService.cs
-- Create: src/DesktopPuppy/Security/IApiKeyStore.cs
-- Create: src/DesktopPuppy/Security/WindowsApiKeyStore.cs
-- Create: src/DesktopPuppy/Settings/SettingsRepository.cs
-- Create: tests/DesktopPuppy.Tests/Ai/DeepSeekContentServiceTests.cs
-- Create: tests/DesktopPuppy.Tests/Security/ApiKeyStoreTests.cs
-
-**Interfaces:**
-- IAiContentProvider.GenerateCandidatesAsync(scene, cancellationToken) returns structured candidates.
-- IApiKeyStore.SaveAsync(provider, apiKey), GetAsync(provider), and DeleteAsync(provider) never expose the key to logs.
-- AiContentService.GenerateOrFallbackAsync(scene, cancellationToken) returns an accepted candidate or local fallback.
-
-- [ ] Step 1: Write failing service tests without real network calls.
-
-Use a fake provider to test successful validation, timeout fallback, malformed candidate fallback, missing-key fallback, and daily-limit fallback. Use an in-memory fake key store for save/get/delete semantics.
-
-- [ ] Step 2: Run RED.
-
-Run:
-~~~text
-dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Ai
-~~~
-Expected: FAIL because provider boundaries and service do not exist.
-
-- [ ] Step 3: Implement the provider and secure storage.
-
-Use a shared HttpClient factory, short timeout, cancellation tokens, structured JSON output, explicit response-size limits, and deepseek-flash as the default model. Use Windows-protected local storage for the key. Redact credentials from exceptions and logs.
-
-- [ ] Step 4: Run GREEN.
-
-Run focused and complete tests. Add only an opt-in manual test path that receives a key from a runtime environment variable; never commit a key or place one in a test file.
-
-- [ ] Step 5: Commit.
-
-~~~text
-git add src/DesktopPuppy/Ai src/DesktopPuppy/Security src/DesktopPuppy/Settings tests/DesktopPuppy.Tests/Ai tests/DesktopPuppy.Tests/Security
-git commit -m "feat: add optional deepseek content provider"
-~~~
-
-## Task 8: Usage collection and daily aggregation
-
-**Files:**
-- Create: src/DesktopPuppy/Usage/ForegroundSessionTracker.cs
-- Create: src/DesktopPuppy/Usage/UsageCollector.cs
-- Create: src/DesktopPuppy/Usage/IdleTimeService.cs
-- Create: src/DesktopPuppy/Usage/ApplicationClassifier.cs
-- Create: src/DesktopPuppy/Usage/DailyUsageAggregator.cs
-- Create: tests/DesktopPuppy.Tests/Usage/ForegroundSessionTrackerTests.cs
-- Create: tests/DesktopPuppy.Tests/Usage/DailyUsageAggregatorTests.cs
-- Create: tests/DesktopPuppy.Tests/Usage/ApplicationClassifierTests.cs
-
-**Interfaces:**
-- ForegroundSessionTracker.OnForegroundApplicationChanged(application, at) closes the prior session and starts the next one.
-- DailyUsageAggregator.Build(day, sessions, interactions) returns immutable report facts.
-- ApplicationClassifier.Classify(processName) returns Work, Entertainment, Utility, or Unknown using local rules.
-
-- [ ] Step 1: Write failing usage tests.
-
-Test session closing, duplicate foreground events, idle-gap exclusion, midnight splitting, application totals, longest continuous session, work/entertainment ratio, hit count, and activity count.
-
-- [ ] Step 2: Run RED.
-
-Run:
-~~~text
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Usage
-~~~
-Expected: FAIL because collector and aggregator are not defined.
+```
 
-- [ ] Step 3: Implement collection and aggregation.
+- [ ] **Step 5: Implement collection and aggregation.**
 
-Use the native foreground watcher, exclude Desktop Puppy itself from usage totals, treat the configured idle threshold as inactive time, close open sessions on shutdown, and flush batched records periodically. Store process names locally; do not store window titles by default.
+Use the native watcher for foreground events, explicit lock/sleep boundaries, a two-second title debounce timer and batched repository writes. Do not store window titles that did not reach stability. Keep all UI updates off the collector thread.
 
-- [ ] Step 4: Run GREEN and perform a manual session check.
+- [ ] **Step 6: Run GREEN and perform a manual session check.**
 
-Run focused and complete tests. Manually switch between two applications, lock/unlock the workstation, leave the computer idle, and verify the sessions.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Usage
+```
 
-- [ ] Step 5: Commit.
+Manually switch applications, lock/unlock, sleep/wake, use a fullscreen application, change window titles rapidly and verify the persisted intervals.
 
-~~~text
+- [ ] **Step 7: Commit.**
+
+```text
 git add src/DesktopPuppy/Usage tests/DesktopPuppy.Tests/Usage
-git commit -m "feat: collect and aggregate local usage statistics"
-~~~
+git commit -m "feat: collect foreground usage and stable window titles"
+```
 
-## Task 9: Activity scheduler, greetings, and daily reports
+## Task 6: Pet window, animation state machine and interaction bubbles
 
 **Files:**
-- Create: src/DesktopPuppy/Activities/ActivityDefinition.cs
-- Create: src/DesktopPuppy/Activities/ActivityScheduler.cs
-- Create: src/DesktopPuppy/Activities/CooldownStore.cs
-- Create: src/DesktopPuppy/Activities/GreetingService.cs
-- Create: src/DesktopPuppy/Reports/DailyReportFacts.cs
-- Create: src/DesktopPuppy/Reports/DailyReportService.cs
-- Create: src/DesktopPuppy/Reports/LocalReportFallback.cs
-- Create: tests/DesktopPuppy.Tests/Activities/ActivitySchedulerTests.cs
-- Create: tests/DesktopPuppy.Tests/Activities/GreetingServiceTests.cs
-- Create: tests/DesktopPuppy.Tests/Reports/DailyReportServiceTests.cs
+- Create: `src/DesktopPuppy/Pet/PetWindow.xaml`
+- Create: `src/DesktopPuppy/Pet/PetWindow.xaml.cs`
+- Create: `src/DesktopPuppy/Pet/Animation/AnimationClip.cs`
+- Create: `src/DesktopPuppy/Pet/Animation/AnimationState.cs`
+- Create: `src/DesktopPuppy/Pet/Animation/AnimationController.cs`
+- Create: `src/DesktopPuppy/Pet/Interaction/InteractionController.cs`
+- Create: `src/DesktopPuppy/Pet/Interaction/HitReactionService.cs`
+- Create: `src/DesktopPuppy/Pet/Interaction/PetInteractionEvent.cs`
+- Create: `src/DesktopPuppy/Pet/Bubbles/SpeechBubble.cs`
+- Create: `src/DesktopPuppy/Pet/Bubbles/SpeechBubbleManager.cs`
+- Create: `assets/pet/.gitkeep`
+- Create: `tests/DesktopPuppy.Tests/Pet/AnimationControllerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Pet/InteractionControllerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Pet/HitReactionServiceTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Pet/SpeechBubbleManagerTests.cs`
 
 **Interfaces:**
-- ActivityScheduler.TrySchedule(context) returns an activity decision or no-op due to cooldown, quiet hours, fullscreen, or daily limit.
-- GreetingService.GetGreeting(context) returns a local or AI-backed line while consulting content history.
-- DailyReportService.BuildAsync(facts, cancellationToken) returns a validated report or local fallback.
+- `AnimationController.Play(AnimationClip)` starts a finite clip and raises `Completed`.
+- `AnimationController.SetIdle(AnimationState)` selects idle without a permanent high-FPS loop.
+- `HitReactionService.RegisterHit(DateTimeOffset)` returns whether a hit is accepted after cooldown.
+- `InteractionController` emits single click, double-click, right-click, drag and hit events using the system double-click time.
+- `SpeechBubbleManager.AddPlaceholder(requestId, text, expiresAt)` and `ReplacePlaceholder(requestId, text)` manage right-click AI bubbles.
+- `SpeechBubbleManager.Close(requestId)` closes one bubble; bubbles are laid out around and moved with the pet.
 
-- [ ] Step 1: Write failing scheduler and report tests.
+- [ ] **Step 1: Write failing animation and interaction tests.**
 
-Test global cooldown, per-activity cooldown, daily maximum, quiet hours, fullscreen suppression, once-per-day greeting, and report-fact preservation. Test that a report cannot change a duration or application name supplied in facts.
+Test:
 
-- [ ] Step 2: Run RED.
+```text
+idle -> hit -> idle after clip duration
+hit during cooldown is rejected
+single click is delayed until system double-click window expires
+double click cancels single-click and emits hit
+right click emits special interaction
+right click does not open a pet context menu
+drag emits movement without emitting click or hit
+```
 
-Run:
-~~~text
+- [ ] **Step 2: Write failing bubble tests.**
+
+Test that:
+
+```text
+placeholder expires after 15 seconds
+successful result replaces the placeholder
+late result is marked not displayed
+closing one bubble leaves others open
+bubbles keep relative placement when the pet moves
+```
+
+- [ ] **Step 3: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Pet
+```
+
+- [ ] **Step 4: Implement the WPF rendering and interaction surface.**
+
+Use frame swapping or `WriteableBitmap` updates. Start a Dispatcher timer only while a finite clip is active. Configure the transparent window through the native adapter. Display placeholder bubbles immediately for right-click AI scenes; do not write placeholders to displayed content history.
+
+- [ ] **Step 5: Run GREEN and manually verify the window.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Pet
+```
+
+Verify click/double-click/right-click/drag, multi-monitor placement, edge clamping, DPI changes, bubble close buttons and persistent bubble movement.
+
+- [ ] **Step 6: Commit.**
+
+```text
+git add src/DesktopPuppy/Pet assets tests/DesktopPuppy.Tests/Pet
+git commit -m "feat: add pet interactions animations and bubbles"
+```
+
+## Task 7: Local content library, hard validator and candidate pool primitives
+
+**Files:**
+- Create: `src/DesktopPuppy/Content/PersonaProfile.cs`
+- Create: `src/DesktopPuppy/Content/SceneCardFactory.cs`
+- Create: `src/DesktopPuppy/Content/LocalPhraseBank.cs`
+- Create: `src/DesktopPuppy/Content/ContentValidator.cs`
+- Create: `src/DesktopPuppy/Content/ContentSelector.cs`
+- Create: `src/DesktopPuppy/Content/CandidatePool.cs`
+- Create: `src/DesktopPuppy/Content/Similarity/NormalizedText.cs`
+- Create: `src/DesktopPuppy/Content/Similarity/NgramSimilarity.cs`
+- Create: `src/DesktopPuppy/Content/Phrases/seed-phrases.json`
+- Create: `tests/DesktopPuppy.Tests/Content/ContentValidatorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Content/ContentSelectorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Content/CandidatePoolTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Content/NgramSimilarityTests.cs`
+
+**Interfaces:**
+- `ContentValidator.Validate(ContentCandidate candidate, SceneCard scene, IReadOnlyList<ContentHistoryRecord> recent)` returns accepted/rejected plus explicit reasons.
+- `CandidatePool.AddValidated(ContentCandidate candidate)` adds only valid, non-duplicate candidates.
+- `CandidatePool.HasMinimum(int minimum)` returns true at four valid candidates.
+- `ContentSelector.SelectLocalTieBreak(...)` ranks valid candidates by display history, similarity, scene relevance, style cooldown and length.
+
+- [ ] **Step 1: Write failing validator tests.**
+
+Cover empty text, scene length ranges, Markdown, multiple paragraphs, prohibited AI phrases, excessive emoji, repeated punctuation, unsupported facts, exact duplicates, high n-gram similarity, repeated humor style and acceptance of a short concrete mischievous line.
+
+Use these profiles:
+
+```text
+ClickHit: 8-30
+Greeting: 10-50
+Activity: 10-60
+UserRequested: 10-80
+Report: 200-500 with basic format checks only
+```
+
+- [ ] **Step 2: Write failing candidate-pool tests.**
+
+Cover six candidates per batch, rejected candidates not entering the pool, current-batch deduplication, 15-day history comparison and stopping when four valid candidates exist without imposing a five-candidate cap.
+
+- [ ] **Step 3: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Content
+```
+
+- [ ] **Step 4: Implement local content rules.**
+
+Use normalized text and n-gram similarity. The validator rejects; it never silently rewrites a candidate. Store rejected counts and reasons without storing rejected full text.
+
+- [ ] **Step 5: Run GREEN.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Content
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+- [ ] **Step 6: Commit.**
+
+```text
+git add src/DesktopPuppy/Content tests/DesktopPuppy.Tests/Content
+git commit -m "feat: add content validation and candidate pools"
+```
+
+## Task 8: DPAPI key store, DeepSeek provider and candidate generation
+
+**Files:**
+- Create: `src/DesktopPuppy/Security/IApiKeyProtector.cs`
+- Create: `src/DesktopPuppy/Security/DpapiApiKeyProtector.cs`
+- Create: `src/DesktopPuppy/Security/ApiKeyService.cs`
+- Create: `src/DesktopPuppy/Ai/IAiContentProvider.cs`
+- Create: `src/DesktopPuppy/Ai/AiProviderException.cs`
+- Create: `src/DesktopPuppy/Ai/DeepSeek/DeepSeekContentProvider.cs`
+- Create: `src/DesktopPuppy/Ai/DeepSeek/DeepSeekRequest.cs`
+- Create: `src/DesktopPuppy/Ai/DeepSeek/DeepSeekResponse.cs`
+- Create: `src/DesktopPuppy/Ai/CandidatePoolBuilder.cs`
+- Create: `tests/DesktopPuppy.Tests/Security/DpapiApiKeyProtectorTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Security/ApiKeyServiceTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Ai/DeepSeekContentProviderTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Ai/CandidatePoolBuilderTests.cs`
+
+**Interfaces:**
+- `IApiKeyProtector.Protect(string plaintext)` and `Unprotect(byte[] ciphertext)` use current-user DPAPI.
+- `ApiKeyService.SaveAsync(provider, key)`, `GetAsync(provider)` and `DeleteAsync(provider)` use the encrypted blob repository; key values never enter log scopes or exceptions.
+- `IAiContentProvider.GenerateCandidatesAsync(SceneCard scene, IReadOnlyList<ContentCandidate> existing, int variation, CancellationToken cancellationToken)` returns exactly six parsed candidates or a typed failure.
+- `CandidatePoolBuilder.FillAsync(SceneCard scene, CancellationToken cancellationToken)` makes serial DeepSeek requests, validates every candidate locally, persists valid candidates, stops at four valid candidates and fails after five total attempts if fewer than four exist.
+
+- [ ] **Step 1: Write failing security tests.**
+
+Test that:
+
+```text
+protect then unprotect round-trips the key
+wrong user/context cannot unprotect the blob
+save/get/delete uses provider-specific blobs
+ordinary settings never contain the key
+exceptions and test output do not contain the key text
+```
+
+Use a fake protector for non-Windows service tests and a Windows integration test for the real DPAPI adapter.
+
+- [ ] **Step 2: Write failing DeepSeek contract tests.**
+
+Use a fake `HttpMessageHandler` to test:
+
+```text
+valid JSON with six candidates parses
+empty body fails
+invalid JSON fails
+wrong candidate count fails
+HTTP error fails
+request body contains compact scene context and existing candidates
+request body never contains an API key
+```
+
+- [ ] **Step 3: Write failing candidate-pool retry tests.**
+
+Cover:
+
+```text
+first batch yields four valid candidates and stops
+invalid candidates are not persisted as full text
+candidate batches are requested serially
+existing candidates are included in the next prompt
+same prompt is not sent unchanged; variation number changes
+fewer than four candidates after five attempts returns failure
+backoff receives 1, 2, 4 and 8 second delays through an injected delay service
+```
+
+- [ ] **Step 4: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Ai
+```
+
+- [ ] **Step 5: Implement the provider and pool builder.**
+
+Use one shared `HttpClient`, scene-specific timeouts, `System.Text.Json`, response-size limits, structured JSON prompts and cancellation tokens. The provider default is `deepseek-flash`. Do not retry on the WPF Dispatcher. Count the initial request as attempt one.
+
+- [ ] **Step 6: Run GREEN.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Ai
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+- [ ] **Step 7: Commit.**
+
+```text
+git add src/DesktopPuppy/Security src/DesktopPuppy/Ai tests/DesktopPuppy.Tests/Security tests/DesktopPuppy.Tests/Ai
+git commit -m "feat: add encrypted keys and DeepSeek candidate generation"
+```
+
+## Task 9: Jev provider and candidate selection
+
+**Files:**
+- Create: `src/DesktopPuppy/Ai/Jev/IJevDecisionProvider.cs`
+- Create: `src/DesktopPuppy/Ai/Jev/JevDecisionProvider.cs`
+- Create: `src/DesktopPuppy/Ai/Jev/JevRequest.cs`
+- Create: `src/DesktopPuppy/Ai/Jev/JevResponse.cs`
+- Create: `src/DesktopPuppy/Ai/Jev/JevSelectionService.cs`
+- Create: `tests/DesktopPuppy.Tests/Ai/JevDecisionProviderTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Ai/JevSelectionServiceTests.cs`
+
+**Interfaces:**
+- `IJevDecisionProvider.SelectBestAsync(SceneCard scene, IReadOnlyList<ContentCandidate> candidates, CancellationToken cancellationToken)` calls the official TypeSafe API with model `jev-latest`.
+- `JevSelectionService.SelectAsync(...)` retries only Jev, not DeepSeek, with a five-second per-attempt timeout, five total attempts and `1,2,4,8` second backoff.
+- `JevSelectionResult` contains `BestCandidateId`, `Confidence`, `Probabilities` and raw provider status without raw secrets.
+
+The Jev request includes compact structured context and all valid candidates, but not the complete DeepSeek prompt, all 15-day title history or rejected candidate text. The decision question is one `Choice`; no extra Score/Noul questions are sent.
+
+- [ ] **Step 1: Write failing provider tests.**
+
+Use a fake HTTP handler to test:
+
+```text
+request uses the official System One endpoint and jev-latest
+valid Choice response maps to candidate ID and probabilities
+empty response fails
+invalid JSON fails
+unknown candidate ID fails
+HTTP error fails
+request body excludes API keys and rejected candidates
+```
+
+- [ ] **Step 2: Write failing selection tests.**
+
+Cover:
+
+```text
+valid Jev result selects the requested candidate
+confidence below .55 invokes local tie-breaking but does not retry
+first/second probability gap below .10 invokes local tie-breaking
+unknown candidate triggers Jev retry
+Jev failure does not regenerate DeepSeek candidates
+five Jev failures return a typed failure
+```
+
+- [ ] **Step 3: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Jev
+```
+
+- [ ] **Step 4: Implement Jev integration.**
+
+Use the independently stored Jev API key, a shared `HttpClient`, five-second cancellation, structured request serialization and explicit model `jev-latest`. Keep local tie-breaking deterministic under an injected random source.
+
+- [ ] **Step 5: Run GREEN.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Jev
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+- [ ] **Step 6: Commit.**
+
+```text
+git add src/DesktopPuppy/Ai/Jev tests/DesktopPuppy.Tests/Ai
+git commit -m "feat: add Jev candidate selection"
+```
+
+## Task 10: Activity scheduler, greetings and right-click AI orchestration
+
+**Files:**
+- Create: `src/DesktopPuppy/Activities/ActivityDefinition.cs`
+- Create: `src/DesktopPuppy/Activities/ActivityScheduler.cs`
+- Create: `src/DesktopPuppy/Activities/CooldownStore.cs`
+- Create: `src/DesktopPuppy/Activities/GreetingService.cs`
+- Create: `src/DesktopPuppy/Activities/RightClickSpecialInteractionService.cs`
+- Create: `src/DesktopPuppy/Activities/AiSceneOrchestrator.cs`
+- Create: `tests/DesktopPuppy.Tests/Activities/ActivitySchedulerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Activities/GreetingServiceTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Activities/RightClickSpecialInteractionTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Activities/AiSceneOrchestratorTests.cs`
+
+**Interfaces:**
+- `ActivityScheduler.TrySchedule(ActivityContext)` returns a local decision or no-op because of cooldown, quiet hours, fullscreen, pause or disabled state; it never calls AI.
+- `GreetingService.GetGreetingAsync(GreetingContext, CancellationToken)` uses local phrases or the AI scene pipeline according to policy.
+- `RightClickSpecialInteractionService.HandleAsync(RightClickContext, CancellationToken)` plays local animation immediately, evaluates the right-click AI conditions, creates a 15-second placeholder and replaces it only when a result returns in time.
+- `AiSceneOrchestrator.GenerateAndSelectAsync(SceneCard, CancellationToken)` composes `CandidatePoolBuilder`, `JevSelectionService`, repositories and notification service.
+
+Right-click AI is allowed only when the setting is enabled and at least one condition is true: title changed since the prior special interaction, no similar displayed right-click line exists in the 15-day window, at least five minutes elapsed since the last AI right-click, or the current time is a special period such as late night.
+
+- [ ] **Step 1: Write failing scheduler tests.**
+
+Cover global cooldown, per-activity cooldown, no daily cap, quiet hours, fullscreen suppression, pause suppression, blacklisted applications, and local deterministic decisions.
+
+- [ ] **Step 2: Write failing greeting and right-click tests.**
+
+Cover:
+
+```text
+every ordinary click and hit uses local content without AI
+right-click always plays local animation
+right-click condition evaluation is local
+a right-click can create an independent AI request
+multiple right-click requests do not cancel each other
+placeholder is removed after 15 seconds
+late AI result is recorded but not displayed
+five failed attempts remove the placeholder and notify
+```
+
+- [ ] **Step 3: Run RED.**
+
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Activities
-~~~
-Expected: FAIL because scheduler and report services are not defined.
+```
 
-- [ ] Step 3: Implement local behavior and orchestration.
+- [ ] **Step 4: Implement local orchestration.**
 
-Keep trigger decisions local and deterministic. Build scene cards, ask the AI service only when hybrid policy allows it, persist accepted lines, and use local seed phrases when a request fails or is suppressed.
+Keep trigger decisions deterministic and independent from provider availability. Use separate request IDs for concurrent scenes. Persist displayed content only after the final bubble is actually shown.
 
-- [ ] Step 4: Run GREEN.
+- [ ] **Step 5: Run GREEN.**
 
-Run focused and complete tests. Use an injected clock to verify greeting and report rollover without waiting for a real date boundary.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Activities
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
 
-- [ ] Step 5: Commit.
+- [ ] **Step 6: Commit.**
 
-~~~text
-git add src/DesktopPuppy/Activities src/DesktopPuppy/Reports tests/DesktopPuppy.Tests/Activities tests/DesktopPuppy.Tests/Reports
-git commit -m "feat: add activities greetings and daily reports"
-~~~
+```text
+git add src/DesktopPuppy/Activities tests/DesktopPuppy.Tests/Activities
+git commit -m "feat: add local activities and right-click AI scenes"
+```
 
-## Task 10: Settings UI, report window, and tray controls
+## Task 11: Daily report planner, generation and history
 
 **Files:**
-- Create: src/DesktopPuppy/Settings/SettingsWindow.xaml
-- Create: src/DesktopPuppy/Settings/SettingsWindow.xaml.cs
-- Create: src/DesktopPuppy/Settings/SettingsViewModel.cs
-- Create: src/DesktopPuppy/Reports/ReportWindow.xaml
-- Create: src/DesktopPuppy/Reports/ReportWindow.xaml.cs
-- Modify: src/DesktopPuppy/Pet/PetWindow.xaml
-- Modify: src/DesktopPuppy/App.xaml.cs
-- Create: tests/DesktopPuppy.Tests/Settings/SettingsViewModelTests.cs
+- Create: `src/DesktopPuppy/Reports/DailyReportFacts.cs`
+- Create: `src/DesktopPuppy/Reports/DailyReportPlan.cs`
+- Create: `src/DesktopPuppy/Reports/DailyReportPlanner.cs`
+- Create: `src/DesktopPuppy/Reports/DailyReportService.cs`
+- Create: `src/DesktopPuppy/Reports/ReportNoveltyScorer.cs`
+- Create: `src/DesktopPuppy/Reports/ReportNotificationService.cs`
+- Create: `tests/DesktopPuppy.Tests/Reports/DailyReportPlannerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Reports/ReportNoveltyScorerTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Reports/DailyReportServiceTests.cs`
 
 **Interfaces:**
-- The settings view model exposes bindable properties for behavior, statistics, quiet hours, AI, key state, request limits, and data deletion.
-- The report window consumes DailyReportFacts and a validated report result; it does not calculate usage numbers itself.
+- `DailyReportFacts Build(localDate, cutoffLocal, sessions, interactions)` returns immutable local facts.
+- `DailyReportPlanner.Create(facts, recentDisplayedReports)` chooses a theme, format, style and fixed cutoff without fabricating facts.
+- `ReportNoveltyScorer.Score(candidate, recentDisplayedReports, plan)` rejects high similarity and ranks unused themes, formats, styles and openings.
+- `DailyReportService.GenerateAsync(plan, cancellationToken)` uses the same candidate pool and Jev selection pipeline with a 200-500 character report profile.
+- `ReportNotificationService.NotifySuccess(reportId)` and `NotifyFailure(reportId)` are non-blocking and suppressed while the pet is hidden or fullscreen.
 
-- [ ] Step 1: Write failing view-model tests.
+- [ ] **Step 1: Write failing report-facts tests.**
 
-Test that changing the AI toggle persists, entering a key updates only the secure key store, deleting history calls the storage boundary, and changing activity frequency updates scheduler configuration.
+Cover local-day cutoff at 18:20, foreground duration threshold greater than 30 minutes, midnight splitting, no activity, insufficient activity, and a report record that remains tied to its original local date and cutoff.
 
-- [ ] Step 2: Run RED.
+- [ ] **Step 2: Write failing novelty tests.**
 
-Run:
-~~~text
+Cover:
+
+```text
+theme is not reused within five prior report days
+format is not reused within five prior report days
+style is not repeated within the prior two report days
+recent opening and n-gram similarity lower novelty score
+low-data day produces no plan
+same plan is returned for manual retry
+```
+
+- [ ] **Step 3: Write failing report service tests.**
+
+Cover:
+
+```text
+18:20 generation uses 00:00-18:20 facts
+late use after 18:20 cannot make a skipped report eligible
+startup after missed schedule checks the original cutoff
+multiple shutdown days skip days with insufficient activity
+six candidates per DeepSeek request and four-valid threshold
+200-500 character report profile
+successful report stores AI prose and exact local facts separately
+failed report offers manual retry and does not auto-retry on next startup
+```
+
+- [ ] **Step 4: Run RED.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Reports
+```
+
+- [ ] **Step 5: Implement the planner and report pipeline.**
+
+Use recent displayed report summaries, not all raw report text, for novelty context. Keep the exact facts in the database and collapsed report UI; allow AI prose to be creative without treating it as a canonical statistical record.
+
+- [ ] **Step 6: Run GREEN.**
+
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Reports
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
+
+- [ ] **Step 7: Commit.**
+
+```text
+git add src/DesktopPuppy/Reports tests/DesktopPuppy.Tests/Reports
+git commit -m "feat: add novel scheduled daily reports"
+```
+
+## Task 12: Settings, tray commands, notifications and report UI
+
+**Files:**
+- Create: `src/DesktopPuppy/Settings/SettingsWindow.xaml`
+- Create: `src/DesktopPuppy/Settings/SettingsWindow.xaml.cs`
+- Create: `src/DesktopPuppy/Settings/SettingsViewModel.cs`
+- Create: `src/DesktopPuppy/Settings/ApiKeyViewModel.cs`
+- Create: `src/DesktopPuppy/Reports/ReportWindow.xaml`
+- Create: `src/DesktopPuppy/Reports/ReportWindow.xaml.cs`
+- Create: `src/DesktopPuppy/Reports/ReportHistoryViewModel.cs`
+- Create: `src/DesktopPuppy/Notifications/WindowsNotificationService.cs`
+- Modify: `src/DesktopPuppy/Pet/PetWindow.xaml`
+- Modify: `src/DesktopPuppy/App.xaml.cs`
+- Create: `tests/DesktopPuppy.Tests/Settings/SettingsViewModelTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Reports/ReportHistoryViewModelTests.cs`
+
+**Interfaces:**
+- `SettingsViewModel` exposes behavior, statistics, quiet hours, fullscreen, AI toggles, request settings, startup, key state, clear-history, delete-key and export commands.
+- `ApiKeyViewModel` exposes only key presence and masked input state; it never exposes the decrypted key after save.
+- `ReportWindow` displays AI prose and a collapsed local-facts panel, plus the last 15 local days and skip/failure statuses.
+- `WindowsNotificationService` sends non-blocking success/failure notifications and exposes retry callbacks without blocking the Dispatcher.
+
+- [ ] **Step 1: Write failing view-model tests.**
+
+Cover:
+
+```text
+AI toggles persist
+right-click AI toggle persists
+entering a key saves only through the encrypted key service
+key presence is shown without returning plaintext
+clear history deletes operational history but keeps settings
+delete API keys calls both provider-specific deletes
+changing activity frequency updates scheduler
+```
+
+- [ ] **Step 2: Write failing report-history tests.**
+
+Cover last-15-day listing, skip reasons, failure status, manual retry using the stored plan, expanded local facts and report date ordering.
+
+- [ ] **Step 3: Run RED.**
+
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Settings
-~~~
-Expected: FAIL because the view model is not defined.
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~ReportHistory
+```
 
-- [ ] Step 3: Implement WPF settings and reports.
+- [ ] **Step 4: Implement settings, notifications and report UI.**
 
-Add compact native WPF controls. Add tray commands for show/hide, pause, settings, today’s report, reset data, and exit. Mask API key input and never bind the actual key into a visible text property after save.
+Use compact native WPF controls. Keep the AI prose prominent and exact facts collapsed. Provide tray commands for show/hide, pause/resume, settings, today’s report, clear history, delete keys and exit. Use the Windows system double-click setting and saved logical pet position.
 
-- [ ] Step 4: Run GREEN and manually verify the UI.
+- [ ] **Step 5: Run GREEN and manually verify the UI.**
 
-Run all tests. Manually verify keyboard navigation, DPI scaling, settings persistence, tray commands, report display, and key deletion.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+git diff --check
+```
 
-- [ ] Step 5: Commit.
+Manually verify keyboard navigation, DPI scaling, key masking, report notifications, report retry, report history, tray commands, bubble close buttons and clear-history confirmation.
 
-~~~text
-git add src/DesktopPuppy/Settings src/DesktopPuppy/Reports src/DesktopPuppy/Pet src/DesktopPuppy/App.xaml.cs tests/DesktopPuppy.Tests/Settings
-git commit -m "feat: add settings report and tray controls"
-~~~
+- [ ] **Step 6: Commit.**
 
-## Task 11: Low-power behavior and graceful shutdown
+```text
+git add src/DesktopPuppy/Settings src/DesktopPuppy/Reports src/DesktopPuppy/Notifications src/DesktopPuppy/Pet src/DesktopPuppy/App.xaml.cs tests/DesktopPuppy.Tests/Settings tests/DesktopPuppy.Tests/Reports
+git commit -m "feat: add settings notifications and report history UI"
+```
+
+## Task 13: Runtime coordination, startup delay and graceful shutdown
 
 **Files:**
-- Create: src/DesktopPuppy/Runtime/PowerPolicy.cs
-- Create: src/DesktopPuppy/Runtime/BackgroundWorkCoordinator.cs
-- Create: src/DesktopPuppy/Runtime/ShutdownCoordinator.cs
-- Create: tests/DesktopPuppy.Tests/Runtime/PowerPolicyTests.cs
-- Create: tests/DesktopPuppy.Tests/Runtime/ShutdownCoordinatorTests.cs
+- Create: `src/DesktopPuppy/Runtime/PowerPolicy.cs`
+- Create: `src/DesktopPuppy/Runtime/BackgroundWorkCoordinator.cs`
+- Create: `src/DesktopPuppy/Runtime/StartupDelayCoordinator.cs`
+- Create: `src/DesktopPuppy/Runtime/ShutdownCoordinator.cs`
+- Create: `src/DesktopPuppy/Runtime/SingleInstanceActivationService.cs`
+- Create: `tests/DesktopPuppy.Tests/Runtime/PowerPolicyTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Runtime/StartupDelayTests.cs`
+- Create: `tests/DesktopPuppy.Tests/Runtime/ShutdownCoordinatorTests.cs`
 
 **Interfaces:**
-- PowerPolicy.ShouldAnimate(state, context) controls active rendering.
-- BackgroundWorkCoordinator schedules collection flushes, activity evaluation, and report generation without blocking UI.
-- ShutdownCoordinator.StopAsync() stops hooks, flushes usage sessions, persists settings, and closes the database.
+- `PowerPolicy.ShouldAnimate(state, context)` suppresses animation during hidden, paused and fullscreen states.
+- `BackgroundWorkCoordinator` schedules retention, 18:20 report checks, usage flushes and activity evaluation without blocking UI.
+- `StartupDelayCoordinator.StartAsync(bool startupArgument, CancellationToken)` delays only `--startup` launches by 10 seconds; tray Show cancels the delay immediately.
+- `ShutdownCoordinator.StopAsync()` stops hooks, closes sessions, flushes repositories, cancels AI, persists settings, disposes tray and closes the database.
+- `SingleInstanceActivationService` forwards second-launch activation to the existing process.
 
-- [ ] Step 1: Write failing power and shutdown tests.
+- [ ] **Step 1: Write failing runtime tests.**
 
-Test no animation work while idle, fullscreen suppression, shutdown closing open sessions, and cancellation of pending AI requests.
+Cover:
 
-- [ ] Step 2: Run RED.
+```text
+hidden and paused states do not animate
+fullscreen suppresses new activity but does not cancel existing AI
+startup argument waits 10 seconds
+manual launch does not wait
+tray Show cancels startup delay
+tray is available during delay
+shutdown cancels all pending requests
+shutdown closes open sessions
+shutdown flushes retention and settings before database close
+```
 
-Run:
-~~~text
+- [ ] **Step 2: Run RED.**
+
+```text
 dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Runtime
-~~~
-Expected: FAIL because runtime services are not defined.
+```
 
-- [ ] Step 3: Implement low-power coordination.
+- [ ] **Step 3: Implement background coordination and shutdown order.**
 
-Use event-driven wakeups for animations and foreground changes, bounded timers for periodic work, cancellation tokens for shutdown, and one final transactional flush. Network and database work must not run on the WPF dispatcher thread.
+Initialize the database, tray, foreground watcher, fullscreen detector and usage collector immediately on `--startup`; show the pet after the delay. Keep AI requests independent across scenes and use linked cancellation only for application shutdown.
 
-- [ ] Step 4: Run GREEN and inspect idle behavior.
+- [ ] **Step 4: Run GREEN and inspect idle behavior.**
 
-Run all tests. Leave the app idle for at least 15 minutes and inspect Task Manager or Performance Monitor for continuous CPU activity. Test fullscreen suppression and suspend/resume.
+```text
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj --filter FullyQualifiedName~Runtime
+dotnet test tests/DesktopPuppy.Tests/DesktopPuppy.Tests.csproj
+```
 
-- [ ] Step 5: Commit.
+Leave the app idle for at least 15 minutes, inspect CPU activity, test fullscreen suppression, lock/unlock, sleep/wake, startup delay and exit during an in-flight request.
 
-~~~text
+- [ ] **Step 5: Commit.**
+
+```text
 git add src/DesktopPuppy/Runtime tests/DesktopPuppy.Tests/Runtime
-git commit -m "feat: add low-power runtime coordination"
-~~~
+git commit -m "feat: add runtime coordination and graceful shutdown"
+```
 
-## Task 12: End-to-end verification and privacy documentation
+## Task 14: Composition root, end-to-end verification and privacy documentation
 
 **Files:**
-- Create: tests/DesktopPuppy.Tests/EndToEnd/LocalModeScenarioTests.cs
-- Create: tests/DesktopPuppy.Tests/EndToEnd/AiFallbackScenarioTests.cs
-- Create: docs/testing/manual-test-matrix.md
-- Create: docs/privacy/data-collection.md
-- Modify: README.md
+- Create: `tests/DesktopPuppy.Tests/EndToEnd/LocalModeScenarioTests.cs`
+- Create: `tests/DesktopPuppy.Tests/EndToEnd/AiCandidateSelectionScenarioTests.cs`
+- Create: `tests/DesktopPuppy.Tests/EndToEnd/ReportScenarioTests.cs`
+- Create: `tests/DesktopPuppy.Tests/EndToEnd/PrivacyAndDeletionScenarioTests.cs`
+- Create: `docs/testing/manual-test-matrix.md`
+- Create: `docs/privacy/data-collection.md`
+- Modify: `README.md`
+- Modify: `src/DesktopPuppy/App.xaml.cs`
 
 **Interfaces:**
-- End-to-end tests exercise local mode, hybrid mode with a fake provider, AI timeout fallback, daily rollover, repeated-line rejection, fullscreen suppression, and data deletion.
+- `App.xaml.cs` composes concrete adapters and services exactly once for the single process.
+- End-to-end tests use fake DeepSeek and Jev providers to avoid network calls and API keys.
 
-- [ ] Step 1: Write failing scenario tests.
+- [ ] **Step 1: Write failing end-to-end tests.**
 
-Cover a local-mode day, a hybrid-mode day with accepted candidates, timeout fallback, invalid JSON fallback, a repeated sentence rejected by history, fullscreen suppression, and clear-history behavior.
+Cover:
 
-- [ ] Step 2: Run RED.
+```text
+local mode with no AI calls
+right-click hybrid mode with six candidates and Jev selection
+candidate-pool retry and five-attempt failure
+Jev-only retry without regenerating candidates
+hidden/fullscreen result recorded but not displayed
+18:20 report with >30 minutes of foreground time
+18:20 report skipped at <=30 minutes even if later usage exceeds threshold
+startup catch-up for a missed eligible report
+multiple shutdown days skip inactive days
+report novelty rotates theme/form/style
+clear-history removes all 15-day operational history
+DPAPI key deletion removes both provider blobs
+```
 
-Run:
-~~~text
+- [ ] **Step 2: Run RED.**
+
+```text
 dotnet test
-~~~
-Expected: FAIL until all previous services are composed in the application host.
+```
 
-- [ ] Step 3: Wire the composition root and write manual checks.
+Expected: failures because composition and end-to-end services are not wired.
 
-Register dependencies in App.xaml.cs. Add the manual matrix for multi-monitor, DPI, startup, tray, idle, fullscreen, audio, API-key deletion, long-running stability, and content quality. Document exactly what is collected and what is not.
+- [ ] **Step 3: Compose the application.**
 
-- [ ] Step 4: Run the full verification suite.
+Register the clock, database, retention service, native adapters, usage collector, content validator, DeepSeek provider, Jev provider, candidate pool, activity engine, report planner, settings view models, tray, notification service and shutdown coordinator in `App.xaml.cs`. Use one shared application cancellation token and one database lifecycle.
 
-Run:
-~~~text
+- [ ] **Step 4: Write the manual test matrix.**
+
+The matrix must include:
+
+```text
+single-instance activation
+HKCU startup enable/disable and 10-second delay
+multiple monitors, DPI and monitor removal
+edge drag and saved position
+single click, double-click hit, right-click special interaction and drag
+persistent bubbles, replacement, late-result suppression and close buttons
+fullscreen exclusive and borderless behavior
+lock, sleep, wake and session boundaries
+stable-title debounce and 15-day retention
+DeepSeek JSON/timeout/empty/invalid/validation failure
+Jev timeout/invalid selection/low confidence
+18:20 report generation, skipped days and manual retry
+report history and collapsed exact facts
+DPAPI key presence, deletion and log redaction
+clear-history and export
+15-minute idle CPU inspection
+```
+
+- [ ] **Step 5: Document the privacy boundary.**
+
+Document exactly what is stored locally, what is sent to DeepSeek and Jev, the 15-day retention rule, the fact that app names and window titles are sent, the fact that key blobs are DPAPI-protected, and the separate clear-history/delete-key operations.
+
+- [ ] **Step 6: Run the complete verification suite.**
+
+```text
 dotnet restore
 dotnet build --configuration Release
 dotnet test --configuration Release --no-restore
 git diff --check
-~~~
-Expected: Release build succeeds, all tests pass, and git diff --check reports no whitespace errors. Complete the manual matrix and record results.
+```
 
-- [ ] Step 5: Commit the MVP verification package.
+Expected: Release build succeeds, all automated tests pass, no whitespace errors are reported, and the manual matrix has recorded results.
 
-~~~text
+- [ ] **Step 7: Commit the MVP verification package.**
+
+```text
 git add src tests docs README.md
 git commit -m "chore: document desktop puppy MVP verification"
-~~~
+```
 
 ## Final completion checklist
 
-- [ ] Release build succeeds.
+- [ ] Release build succeeds on the supported Windows target.
 - [ ] All automated tests pass with zero failures.
-- [ ] Multi-monitor and DPI checks pass.
-- [ ] The pet can be dragged, clicked, hit, hidden, paused, and exited.
-- [ ] Activity cooldowns, quiet hours, and fullscreen suppression work.
-- [ ] Greetings do not repeat within the configured history window.
-- [ ] Usage totals survive restart and shutdown flush.
-- [ ] Reports preserve all locally calculated facts.
-- [ ] AI fallback works for missing key, timeout, invalid JSON, request limit, and rejected content.
-- [ ] The API key is absent from logs, ordinary config, crash output, and source control.
-- [ ] Idle rendering stops and background work is bounded.
-- [ ] Data deletion removes usage, interactions, content history, and stored settings as specified.
+- [ ] The application is single-instance and startup registration is user-scoped.
+- [ ] The pet restores position, survives monitor changes and remains partially visible.
+- [ ] Single click, double-click hit, right-click special interaction and drag work.
+- [ ] Persistent bubbles can be individually closed and follow the pet.
+- [ ] Fullscreen hides all pets and pauses new random activities while statistics continue.
+- [ ] Lock, sleep and hibernate close foreground sessions.
+- [ ] Window titles require two seconds of stability and are retained for 15 local days.
+- [ ] There is no daily activity or AI request cap.
+- [ ] DeepSeek candidate pools use six candidates per serial request and require four valid candidates.
+- [ ] Jev uses `jev-latest`, local tie-breaking and five independent selection attempts.
+- [ ] AI failures do not use fallback; failure notifications are non-blocking and report retry is manual.
+- [ ] Right-click placeholders expire after 15 seconds and late results are not displayed.
+- [ ] Daily reports run at 18:20, use the 30-minute cutoff threshold and rotate novelty dimensions.
+- [ ] Daily report history covers the last 15 local days.
+- [ ] API keys are DPAPI-encrypted before SQLite storage and absent from logs, prompts and source control.
+- [ ] Clear-history removes operational history while separate actions manage settings and keys.
+- [ ] Idle rendering stops and background work remains bounded.
 - [ ] No secrets or generated personal usage data are committed.

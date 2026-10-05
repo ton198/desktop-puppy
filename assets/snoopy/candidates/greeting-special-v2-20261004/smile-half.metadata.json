@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE halfway eye-closure frame preceding this happy closed-eye smile. Change ONLY both eyes: instead of full upward curved closed-eye arcs, use visibly HALF-OPEN happy eyes, each a small black lower oval partly covered by a gently arched upper eyelid. Eye centers match reference; eyelid arch follows same happy direction. Keep eyebrows and smile EXACTLY unchanged. Not sleepy downward lids, no sad/angry expression. Entire head silhouette/nose/ear/tuft/collar/body/limbs/feet/canvas/scale/position fixed. Opaque white character, original black line thickness/red collar. True transparent alpha background. No props/text/shadow/effects/sheet. One full body. This will transition to the reference closed-eye smile.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021627Z-55d092338c42.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T025247Z-7237bf5f5376.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "1dafba5b4c958ab0a4a875705a4c712161cef2daa3e4373f3cfa27461983237e",
+  "created_at": "2026-10-05T02:52:47.270214+00:00"
+}

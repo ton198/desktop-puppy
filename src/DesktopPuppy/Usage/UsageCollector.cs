@@ -22,6 +22,7 @@ public sealed class UsageCollector : IDisposable
     private readonly IForegroundWindowWatcher _foregroundWatcher;
     private readonly ForegroundSessionTracker _sessionTracker;
     private readonly WindowTitleDebouncer _titleDebouncer;
+    private long _foregroundObservationVersion;
     private bool _started;
     private bool _disposed;
     private bool _foregroundCollectionPaused;
@@ -84,6 +85,7 @@ public sealed class UsageCollector : IDisposable
             _foregroundCollectionPaused = false;
             _foregroundWatcher.Start(OnForegroundChanged);
             _started = true;
+            _foregroundWatcher.RefreshForegroundWindow();
         }
     }
 
@@ -92,12 +94,26 @@ public sealed class UsageCollector : IDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (!_started)
+            if (!_started || _foregroundCollectionPaused)
             {
                 return;
             }
 
-            _titleDebouncer.Advance(at);
+            try
+            {
+                // The watcher can return without a snapshot. Only a successful synchronous
+                // observation may promote a pending title or persist a checkpoint.
+                var beforeSample = _foregroundObservationVersion;
+                _foregroundWatcher.RefreshForegroundWindow();
+                if (_foregroundObservationVersion != beforeSample) _titleDebouncer.Advance(at);
+            }
+            catch
+            {
+                // Persistence is optional: preserve retryable debounce state without letting
+                // a storage error escape the recurring ThreadPool timer. Never log titles/errors.
+                try { System.Diagnostics.Trace.TraceWarning("Usage sampling failed; retrying on the next tick."); }
+                catch { /* Diagnostics must not make optional tracking fatal. */ }
+            }
         }
     }
 
@@ -182,10 +198,12 @@ public sealed class UsageCollector : IDisposable
             if (string.Equals(snapshot.ProcessName, _ownProcessName, StringComparison.OrdinalIgnoreCase))
             {
                 _titleDebouncer.OnForegroundWindowLeft(at);
+                _foregroundObservationVersion++;
                 return;
             }
 
             _titleDebouncer.OnTitleChanged(snapshot, at);
+            _foregroundObservationVersion++;
         }
     }
 }

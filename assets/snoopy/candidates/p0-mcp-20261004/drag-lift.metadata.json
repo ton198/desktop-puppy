@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "Create ONE transparent PNG animation keyframe by editing this exact desktop-pet master. This is a precise pose edit, NOT a character redesign. Keep the same square framing, character scale, left-facing three-quarter view, white opaque fill, black outline weight, red collar, nose, black floppy ear, tuft, oval eyes and friendly smile. Preserve the head and collar position and shape exactly; preserve torso, arms and tail as closely as possible. Change ONLY the lower legs and feet below the belly: the dog is gently suspended during mouse drag, both short legs hang loosely, feet angle downward instead of resting flat, with clearly separated feet and plausible simple cartoon anatomy. Modest movement, no elongated legs, no thin waist, no deformed rump. Full character entirely visible with clear padding. True alpha transparency, including outside the character; white character interior must remain opaque. No floor, shadow, human hand, rope, hook, cursor, motion lines, text, watermark, panels or sprite sheet. Match the input image canvas and pixel placement as closely as possible.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T020615Z-031012b5b354.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "2923353191675baf68437429f63d38fc38bd783bb3a525f8ae560d7c1eed805c",
+  "created_at": "2026-10-05T02:06:15.533534+00:00"
+}

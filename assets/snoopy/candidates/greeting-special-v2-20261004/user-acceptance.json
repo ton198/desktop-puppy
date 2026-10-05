@@ -1,0 +1,83 @@
+{
+  "status": "user_accepted",
+  "accepted_local_date": "2026-10-05",
+  "timezone": "America/New_York",
+  "user_statement": "可以，全部通过",
+  "groups": [
+    "greeting",
+    "special-tongue",
+    "special-glance",
+    "special-smile"
+  ],
+  "frames": [
+    {
+      "name": "glance-brow",
+      "sha256": "eb16d06025709666b2477b7587de8ef21cfaab30f1912fd88f849a22e61e205e"
+    },
+    {
+      "name": "glance-entry",
+      "sha256": "5e625287dc1eb50ccdf223673333cc2642e366f2fbd6c141f65d9bcb77040c75"
+    },
+    {
+      "name": "glance-peak",
+      "sha256": "8cc9a7ce68dce772942c98a2e8fc61fef7bfeb3f1e338afb937cc55df8c1c873"
+    },
+    {
+      "name": "greeting-in",
+      "sha256": "ccad47673aaea6b8d05775429e5a925fb47baefdce22a7954dbab1af78498e99"
+    },
+    {
+      "name": "greeting-mid",
+      "sha256": "6f2eb5966aa343d87f184d4264007ecd8e44efa9d2249f73b8af0757326e363b"
+    },
+    {
+      "name": "greeting-out",
+      "sha256": "f98e556b079401f2440960916588c700fb6dd0a312dbeb5d0e120db878b07ed0"
+    },
+    {
+      "name": "greeting-raised",
+      "sha256": "7450056c5639438a7a7c635cbecc7739ed18c9830a07df4ed6679cc47f717de3"
+    },
+    {
+      "name": "greeting-start",
+      "sha256": "c5d076182f13fc715b24f80731a381996999944fbf2b01be2d6fd76357eedea6"
+    },
+    {
+      "name": "idle",
+      "sha256": "f67664cb6802e3154564f0a657ee76c0843150544f96eebc12c54d095bd7f663"
+    },
+    {
+      "name": "smile-half",
+      "sha256": "4e505b951708e1d606ae2df14aa3ed7004857d4e0caddce58a231013a0084ca3"
+    },
+    {
+      "name": "smile-peak",
+      "sha256": "fe36ef04441282182281e60a739f21b808fbf5e996c6a3f6b6251cd6f3e3e539"
+    },
+    {
+      "name": "smile-release",
+      "sha256": "321aeb615b7bcda2a4bf3ed762411fee33e0dbe5ff5d3f590a51b2d827f2231e"
+    },
+    {
+      "name": "tongue-peak",
+      "sha256": "beeb004ffa04ecc0aeb5ceb5d8e28705b7ada92b7f26bbe49d8427df69ac599c"
+    },
+    {
+      "name": "tongue-ready",
+      "sha256": "42fd583f1e1c5145de9c62a031e5739236619ad6454ead1322e7b9fdda993663"
+    },
+    {
+      "name": "tongue-short",
+      "sha256": "16138bfc31ebf0ddd97b664419c9dcc0eda5ea928b0d3bfb018cec40eaecbfa0"
+    },
+    {
+      "name": "tongue-wink",
+      "sha256": "9a214b5962c40cb1b41c5e0c1991eef7f52d50d7016ed353733a285e8f45bc25"
+    }
+  ],
+  "excluded": [
+    "glance-entry-rejected"
+  ],
+  "runtime_integration_verified": false,
+  "note": "用户验收覆盖本版预览中入选的Greeting及三组Special，不将先前未入选候选改为入选，不等于WPF运行时验证。"
+}

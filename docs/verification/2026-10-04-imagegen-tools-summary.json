@@ -1,0 +1,17 @@
+{
+  "scope": "metadata-only passive sample of current configuration; original generation request tools were not retained",
+  "boundary": "codex_to_litellm",
+  "tool_count": 16,
+  "tool_types": {
+    "function": 10,
+    "namespace": 5,
+    "web_search": 1
+  },
+  "native_image_tool": false,
+  "local_image_function_recognized": false,
+  "image_namespace": false,
+  "target_thread_matched": true,
+  "upstream_boundary_capture": "not conclusively matched; do not infer actual upstream request tools from this sample",
+  "probe_stopped": true,
+  "raw_packets_saved": false
+}

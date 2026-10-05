@@ -1,0 +1,50 @@
+[
+  {
+    "name": "idle",
+    "source_filename": "codex-clipboard-6b6bf3b9-83a5-40c5-89d6-3b885c071cdd.png",
+    "sha256": "b78ecb9807d16c5a2dcd5b3c9b6244d8dd91f63dcac7157dcba90c908e5de26c",
+    "selected": true
+  },
+  {
+    "name": "happy",
+    "source_filename": "codex-clipboard-981b058d-b315-424d-8933-22d3cbbe6d86.png",
+    "sha256": "3340cd0ecfd3755d51ec1acc12e96beb7ecd2fb0fa37ce7a6309d2eae82c81f4",
+    "selected": true
+  },
+  {
+    "name": "blink-half",
+    "source_filename": "codex-clipboard-488dd9c9-b21e-4840-854f-82c954cb73b6.png",
+    "sha256": "97ebb9b08ee12f2ff9a9e2b25b553c58926853760c3472889c4633f29fbc603d",
+    "selected": true
+  },
+  {
+    "name": "blink-closed",
+    "source_filename": "codex-clipboard-5e87ec78-d5f1-4124-be4a-bb1f751925f5.png",
+    "sha256": "5083a2e524e249412987f6f5f06b14e93ce8d29655fc85ce4aca28d33a34cf68",
+    "selected": true
+  },
+  {
+    "name": "greeting-other-arm",
+    "source_filename": "codex-clipboard-763f9cfe-13ea-44df-84a2-535720be8ee3.png",
+    "sha256": "78a9550eb4667753da6193d67e26ba69bb1dae1e810171b08da58d9f86f6c35d",
+    "selected": false
+  },
+  {
+    "name": "greeting-high",
+    "source_filename": "codex-clipboard-c6fa7892-78db-4654-8551-161f41b13a8c.png",
+    "sha256": "27765bb7c22b65fda6505649d9c2d6e9b27ca3d82a2bf2501c17413e16c87daa",
+    "selected": true
+  },
+  {
+    "name": "greeting-high-alt",
+    "source_filename": "codex-clipboard-d6e479c2-7d90-49c3-aac7-ed3e77ed8c6c.png",
+    "sha256": "d9a3f0e8270c53601183d4e2087116e6e9ec0830c548864c170355df83d792bf",
+    "selected": false
+  },
+  {
+    "name": "greeting-low",
+    "source_filename": "codex-clipboard-90911481-029e-4a8a-ac94-0b89fbcb289e.png",
+    "sha256": "38009fc33a79e2c57a29ab26270372a75b3313df352b76f3bd4283daab309459",
+    "selected": true
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "Precise localized edit: ONE raised-hand greeting KEY POSE of this exact desktop puppy. Preserve canvas, scale, head/face/ear/nose/tuft/red collar, torso, rump/tail, legs/feet at their original locations. Only move the foreground arm on viewer RIGHT. Shoulder remains at same origin. Upper arm slopes slightly down/right, elbow around upper belly, forearm points up/right. Rounded paw beside collar but not touching collar or ear, palm outward, THREE rounded short lobes with two simple curved separator strokes. Keep this mitten-like paw recognizable for subsequent wave frames, no fingernails/human fingers. A relaxed raised greeting hand, natural continuous elbow, no duplicate arm. Back arm remains hanging. Whole opaque white character, original thick black lines, true alpha transparent background, no shadow/text/props/effects/sheet. Head and planted feet do not move. This will be the common parent for one coherent waving animation.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T024150Z-3364044ec543.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "f9b72c544f9ac471c06259e2b8187612ffed78ec8728003617557fc73ab02cb3",
+  "created_at": "2026-10-05T02:41:50.036392+00:00"
+}

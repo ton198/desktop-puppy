@@ -185,6 +185,7 @@ public partial class App : WpfApplication
             _usageStore = new UsageSqliteStore(
                 Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH"));
             _usageStore.Initialize();
+            _usageStore.RecoverAbandonedTitleIntervals();
 
             var retentionCoordinator = new UsageRetentionCoordinator(
                 _usageStore.PruneBefore,

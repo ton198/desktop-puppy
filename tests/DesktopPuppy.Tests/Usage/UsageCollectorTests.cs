@@ -199,6 +199,192 @@ public sealed class UsageCollectorTests
         Assert.Single(sink.Sessions);
     }
 
+    [Fact]
+    public void Background_sampling_detects_title_changes_without_a_foreground_event()
+    {
+        // Break caught: advancing only the debounce clock leaves the old title open.
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Browser", "First tab"));
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        watcher.SetCurrentSnapshot(Snapshot(10, "Browser", "Second tab"));
+        clock.Set(Start.AddSeconds(5));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddSeconds(7));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddSeconds(10));
+        collector.Stop();
+
+        Assert.Collection(sink.TitleIntervals,
+            first =>
+            {
+                Assert.Equal("First tab", first.WindowTitle);
+                Assert.Equal(Start.AddSeconds(5), first.EndedAt);
+            },
+            second =>
+            {
+                Assert.Equal("Second tab", second.WindowTitle);
+                Assert.Equal(Start.AddSeconds(5), second.StartedAt);
+                Assert.Equal(Start.AddSeconds(10), second.EndedAt);
+            });
+        Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(sink.Sessions).EndedAt - Start);
+    }
+
+    [Fact]
+    public void Sampling_discards_a_title_that_changes_before_the_stability_deadline()
+    {
+        // Break caught: advancing before sampling records a stale pending title.
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Browser", "Transient"));
+        clock.Set(Start.AddSeconds(1));
+        watcher.SetCurrentSnapshot(Snapshot(10, "Browser", "Stable"));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        Assert.Empty(sink.TitleIntervals);
+        clock.Set(Start.AddSeconds(3));
+        collector.Advance(clock.UtcNow);
+        Assert.Equal("Stable", Assert.Single(sink.TitleIntervals).WindowTitle);
+    }
+
+    [Theory]
+    [InlineData(SessionBoundary.Lock)]
+    [InlineData(SessionBoundary.Suspend)]
+    public void Background_sampling_does_not_resume_collection_after_a_boundary(SessionBoundary boundary)
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddSeconds(5));
+        collector.OnSessionBoundary(boundary);
+        watcher.SetCurrentSnapshot(Snapshot(77, "LockApp", "Lock screen"));
+        clock.Set(Start.AddMinutes(5));
+        collector.Advance(clock.UtcNow);
+
+        Assert.Null(collector.CaptureStatisticsSnapshot().ActiveSession);
+        Assert.Equal("Code", Assert.Single(sink.Sessions).ProcessName);
+        Assert.Equal(Start.AddSeconds(5), Assert.Single(sink.TitleIntervals).EndedAt);
+        Assert.DoesNotContain(sink.TitleIntervals, interval => interval.ProcessName == "LockApp");
+    }
+
+    [Fact]
+    public void Start_samples_the_existing_foreground_window_without_waiting_for_a_switch()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        watcher.SetCurrentSnapshot(Snapshot(10, "Code", "main.cs"));
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddMinutes(1));
+        collector.Stop();
+
+        var session = Assert.Single(sink.Sessions);
+        Assert.Equal(Start, session.StartedAt);
+        Assert.Equal(Start.AddMinutes(1), session.EndedAt);
+        Assert.Equal("main.cs", Assert.Single(sink.TitleIntervals).WindowTitle);
+    }
+
+    [Fact]
+    public void Failed_sampling_does_not_promote_an_unconfirmed_pending_title()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Browser", "Old"));
+        watcher.SetCurrentSnapshot(Snapshot(10, "Browser", "New"));
+        watcher.RefreshEnabled = false;
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        Assert.Empty(sink.TitleIntervals);
+        watcher.RefreshEnabled = true;
+        clock.Set(Start.AddSeconds(3));
+        collector.Advance(clock.UtcNow);
+        clock.Set(Start.AddSeconds(5));
+        collector.Advance(clock.UtcNow);
+        var title = Assert.Single(sink.TitleIntervals);
+        Assert.Equal("New", title.WindowTitle);
+        Assert.Equal(Start.AddSeconds(3), title.StartedAt);
+    }
+
+    [Fact]
+    public void Checkpoint_failure_is_contained_and_the_next_sample_retries_the_same_interval()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        var id = Assert.Single(sink.TitleIntervals).Id;
+        sink.FailNextUpsert = true;
+        clock.Set(Start.AddSeconds(32));
+        collector.Advance(clock.UtcNow); // Must not escape a recurring timer callback.
+        Assert.Equal(Start.AddSeconds(2), Assert.Single(sink.TitleIntervals).LastConfirmedAt);
+        clock.Set(Start.AddSeconds(32.25));
+        collector.Advance(clock.UtcNow);
+        var retried = Assert.Single(sink.TitleIntervals);
+        Assert.Equal(id, retried.Id);
+        Assert.Equal(Start.AddSeconds(32.25), retried.LastConfirmedAt);
+        Assert.Null(retried.EndedAt);
+    }
+
+    [Fact]
+    public void Failed_lock_close_retries_the_original_boundary_before_reopening_the_same_title()
+    {
+        var watcher = new FakeForegroundWindowWatcher();
+        var sink = new RecordingUsageSink();
+        var clock = new FixedClock(Start);
+        using var collector = new UsageCollector("DesktopPuppy", clock, watcher, sink);
+        collector.Start();
+        watcher.Emit(Snapshot(10, "Code", "main.cs"));
+        clock.Set(Start.AddSeconds(2));
+        collector.Advance(clock.UtcNow);
+        var originalId = Assert.Single(sink.TitleIntervals).Id;
+        sink.FailNextUpsert = true;
+        clock.Set(Start.AddSeconds(5));
+        Assert.Throws<InvalidOperationException>(() => collector.OnSessionBoundary(SessionBoundary.Lock));
+        clock.Set(Start.AddMinutes(1));
+        collector.Advance(clock.UtcNow);
+        Assert.Null(collector.CaptureStatisticsSnapshot().ActiveSession);
+        clock.Set(Start.AddSeconds(65));
+        collector.RefreshForegroundWindow();
+        clock.Set(Start.AddSeconds(67));
+        collector.Advance(clock.UtcNow);
+
+        Assert.Collection(sink.TitleIntervals,
+            closed =>
+            {
+                Assert.Equal(originalId, closed.Id);
+                Assert.Equal(Start.AddSeconds(5), closed.EndedAt);
+            },
+            reopened =>
+            {
+                Assert.NotEqual(originalId, reopened.Id);
+                Assert.Equal(Start.AddSeconds(65), reopened.StartedAt);
+                Assert.Null(reopened.EndedAt);
+            });
+    }
+
     private static ForegroundWindowSnapshot Snapshot(uint processId, string processName, string title)
     {
         return new ForegroundWindowSnapshot((nint)processId, processId, processName, title);
@@ -221,9 +407,11 @@ public sealed class UsageCollectorTests
 
         public int RefreshCount { get; private set; }
 
+        public bool RefreshEnabled { get; set; } = true;
+
         public void RefreshForegroundWindow()
         {
-            if (_currentSnapshot is null)
+            if (!RefreshEnabled || _currentSnapshot is null)
             {
                 return;
             }
@@ -251,10 +439,17 @@ public sealed class UsageCollectorTests
 
         public List<WindowTitleInterval> TitleIntervals { get; } = [];
 
+        public bool FailNextUpsert { get; set; }
+
         public void AppendSession(ForegroundSession session) => Sessions.Add(session);
 
         public void UpsertWindowTitleInterval(WindowTitleInterval interval)
         {
+            if (FailNextUpsert)
+            {
+                FailNextUpsert = false;
+                throw new InvalidOperationException("Simulated persistence failure.");
+            }
             var existingIndex = TitleIntervals.FindIndex(existing => existing.Id == interval.Id);
             if (existingIndex >= 0)
             {

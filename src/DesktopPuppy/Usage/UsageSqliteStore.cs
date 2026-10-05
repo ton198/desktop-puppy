@@ -11,6 +11,7 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
     {
         SQLitePCL.Batteries_V2.Init();
     }
+    private readonly object _initializationGate = new();
     private readonly string _databasePath;
     private bool _initialized;
     private bool _disposed;
@@ -29,49 +30,84 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
 
     public void Initialize()
     {
+        lock (_initializationGate)
+        {
+            ThrowIfDisposed();
+            if (_initialized) return;
+
+            var directory = Path.GetDirectoryName(_databasePath);
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+
+            using var connection = OpenConnection();
+            using var transaction = connection.BeginTransaction();
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS usage_sessions (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    window_handle INTEGER NOT NULL,
+                    process_id INTEGER NOT NULL,
+                    process_name TEXT NOT NULL,
+                    window_title TEXT NOT NULL,
+                    started_at_utc TEXT NOT NULL,
+                    ended_at_utc TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ix_usage_sessions_started_at_utc
+                    ON usage_sessions (started_at_utc);
+                CREATE TABLE IF NOT EXISTS window_title_intervals (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    window_handle INTEGER NOT NULL,
+                    process_id INTEGER NOT NULL,
+                    process_name TEXT NOT NULL,
+                    window_title TEXT NOT NULL,
+                    started_at_utc TEXT NOT NULL,
+                    ended_at_utc TEXT NULL,
+                    last_confirmed_at_utc TEXT NULL
+                );
+                CREATE INDEX IF NOT EXISTS ix_window_title_intervals_started_at_utc
+                    ON window_title_intervals (started_at_utc);
+                """;
+            command.ExecuteNonQuery();
+
+            command.CommandText = "PRAGMA table_info(window_title_intervals);";
+            bool hasCheckpointColumn = false;
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    if (reader.GetString(1) == "last_confirmed_at_utc") hasCheckpointColumn = true;
+                }
+            }
+            if (!hasCheckpointColumn)
+            {
+                command.CommandText = "ALTER TABLE window_title_intervals ADD COLUMN last_confirmed_at_utc TEXT NULL;";
+                command.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+            _initialized = true;
+        }
+    }
+
+    /// <summary>
+    /// Seal intervals left by a previous process. The single-instance collection owner must
+    /// call this once at startup, before retention or collection; observers must not call it.
+    /// </summary>
+    public void RecoverAbandonedTitleIntervals()
+    {
         ThrowIfDisposed();
-        if (_initialized)
-        {
-            return;
-        }
-
-        var directory = Path.GetDirectoryName(_databasePath);
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
+        EnsureInitialized();
         using var connection = OpenConnection();
+        using var transaction = connection.BeginTransaction();
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
-            CREATE TABLE IF NOT EXISTS usage_sessions (
-                id TEXT PRIMARY KEY NOT NULL,
-                window_handle INTEGER NOT NULL,
-                process_id INTEGER NOT NULL,
-                process_name TEXT NOT NULL,
-                window_title TEXT NOT NULL,
-                started_at_utc TEXT NOT NULL,
-                ended_at_utc TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS ix_usage_sessions_started_at_utc
-                ON usage_sessions (started_at_utc);
-
-            CREATE TABLE IF NOT EXISTS window_title_intervals (
-                id TEXT PRIMARY KEY NOT NULL,
-                window_handle INTEGER NOT NULL,
-                process_id INTEGER NOT NULL,
-                process_name TEXT NOT NULL,
-                window_title TEXT NOT NULL,
-                started_at_utc TEXT NOT NULL,
-                ended_at_utc TEXT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS ix_window_title_intervals_started_at_utc
-                ON window_title_intervals (started_at_utc);
+            UPDATE window_title_intervals
+            SET ended_at_utc = MAX(started_at_utc, COALESCE(last_confirmed_at_utc, started_at_utc))
+            WHERE ended_at_utc IS NULL;
             """;
         command.ExecuteNonQuery();
-        _initialized = true;
+        transaction.Commit();
     }
 
     public void AppendSession(ForegroundSession session)
@@ -123,15 +159,17 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
                 process_name,
                 window_title,
                 started_at_utc,
-                ended_at_utc)
-            VALUES ($id, $windowHandle, $processId, $processName, $windowTitle, $startedAt, $endedAt)
+                ended_at_utc,
+                last_confirmed_at_utc)
+            VALUES ($id, $windowHandle, $processId, $processName, $windowTitle, $startedAt, $endedAt, $lastConfirmedAt)
             ON CONFLICT(id) DO UPDATE SET
                 window_handle = excluded.window_handle,
                 process_id = excluded.process_id,
                 process_name = excluded.process_name,
                 window_title = excluded.window_title,
-                started_at_utc = excluded.started_at_utc,
-                ended_at_utc = excluded.ended_at_utc;
+                started_at_utc = MAX(window_title_intervals.started_at_utc, excluded.started_at_utc),
+                ended_at_utc = excluded.ended_at_utc,
+                last_confirmed_at_utc = excluded.last_confirmed_at_utc;
             """;
         command.Parameters.AddWithValue("$id", interval.Id.ToString("D"));
         command.Parameters.AddWithValue("$windowHandle", interval.Snapshot.WindowHandle.ToInt64());
@@ -142,6 +180,9 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
         command.Parameters.AddWithValue(
             "$endedAt",
             interval.EndedAt is null ? DBNull.Value : FormatInstant(interval.EndedAt.Value));
+        command.Parameters.AddWithValue(
+            "$lastConfirmedAt",
+            interval.LastConfirmedAt is { } confirmedAt ? FormatInstant(confirmedAt) : DBNull.Value);
         command.ExecuteNonQuery();
     }
 
@@ -201,7 +242,7 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, window_handle, process_id, process_name, window_title,
-                   started_at_utc, ended_at_utc
+                   started_at_utc, ended_at_utc, last_confirmed_at_utc
             FROM window_title_intervals
             ORDER BY started_at_utc, id;
             """;
@@ -219,7 +260,10 @@ public sealed class UsageSqliteStore : IUsageEventSink, IDisposable
                 Guid.Parse(reader.GetString(0)),
                 snapshot,
                 ParseInstant(reader.GetString(5)),
-                reader.IsDBNull(6) ? null : ParseInstant(reader.GetString(6))));
+                reader.IsDBNull(6) ? null : ParseInstant(reader.GetString(6)))
+            {
+                LastConfirmedAt = reader.IsDBNull(7) ? null : ParseInstant(reader.GetString(7))
+            });
         }
 
         return intervals;

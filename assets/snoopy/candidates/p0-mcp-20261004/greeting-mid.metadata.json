@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "Precise localized pose edit of this exact desktop pet: ONE intermediate greeting animation frame. Keep the whole original head, face, ear, collar, torso silhouette, rump, tail, legs and feet unchanged in shape and pixel placement. Only change the foreground arm (the large arm visible on viewer's right): bend elbow and lift forearm diagonally upward so the rounded paw is at upper chest height, halfway between a low bent paw at belly height and high waving paw beside collar. Paw points diagonally up/right, fingers simple rounded cartoon digits. Back arm stays hanging down. Natural continuous shoulder attachment, no cut seam, no duplicate old arm, no narrowed rump. Same full-body scale and square framing as reference, thick black lines and opaque white character, red collar. True alpha transparent background. No scene, props, shadows, text, grid, watermark or multiple poses. Head and planted feet MUST NOT move.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T020851Z-0c1d6f746a1c.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "5908f58968685e844c1808b09cebd3bd986f35c3afca607b60f3a992a46fc718",
+  "created_at": "2026-10-05T02:08:51.413939+00:00"
+}

@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE satisfied recovery keyframe after a playful tongue-out gesture, exact reference puppy. Localized facial edit only: tongue fully withdrawn, mouth closed in gentle smug smile, both eyes curved into happy relaxed upward arcs (not squeezed pain eyes), eyebrows relaxed. No cheek marks. Preserve head outline/nose/ear/tuft/collar/body/arms/tail/legs/feet and original placement and proportions unchanged. Same thick black contours, opaque white body and red collar. Entire full-body character with original square framing and scale. True alpha transparency outside character. No objects, background, shadow, floor, letters, watermark, effects or multiple poses. Should transition naturally back to original idle.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021627Z-55d092338c42.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "88b6258384dd04c53c7e276cb5f39bb56c39e532e9184489bda1994a297d77fd",
+  "created_at": "2026-10-05T02:16:27.616943+00:00"
+}

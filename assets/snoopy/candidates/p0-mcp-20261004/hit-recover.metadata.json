@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE recovery facial keyframe of this exact puppy after gentle cartoon flinch. Change only eyes/eyebrows/mouth expression: slightly drooping half-open eyes, inner eyebrow corners lifted mildly, small closed pout replacing smile; looks mock-offended and stubborn but cute, not sad crying or furious. No tears, cheek marks or injury. Preserve exact head silhouette, ear, nose, tuft, red collar, body, both hanging arms, tail, legs, feet, original pixel position and full-body scale. Thick black line style, opaque white character. Square full-body frame matching reference. True alpha transparent background. No props, ground, shadow, letters, watermark, effects or multiple images. Facial keyframe only; no character redesign.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021303Z-1bfe73905459.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "9e671de849080e1941baab2806e33a7deafbdd1b3457751660eaba78a357b7b5",
+  "created_at": "2026-10-05T02:13:03.937990+00:00"
+}

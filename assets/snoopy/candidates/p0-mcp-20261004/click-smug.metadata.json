@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE subtle single-click reaction keyframe, exact same puppy as reference. Localized facial edit only: a cheeky pleased expression, eyes slightly narrowed into friendly confident half-lidded eyes looking toward viewer, one eyebrow raised mildly, same closed friendly smile with slightly smug corner. Keep head shape, nose, ear, tuft, collar, entire torso/arms/tail/legs/feet and their position UNCHANGED. Do not add cheek color or objects. Same thick black outline, opaque white dog, red collar, full-body square framing and scale. True transparent alpha outside dog. No floor, shadow, text, motion marks, watermarks or multiple poses. Personality mischievous but gentle, not angry or menacing. This is an animation facial keyframe, not a redesign.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T020959Z-09e2cb87bf2f.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "b6fb84defc7544d847dc708ba0c63fa10385f2bac2fa04ebe23ca6e02db7cecf",
+  "created_at": "2026-10-05T02:09:59.128372+00:00"
+}

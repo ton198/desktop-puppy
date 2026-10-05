@@ -1,0 +1,15 @@
+{
+  "operation": "edit",
+  "prompt": "ONE playful tongue-out facial keyframe of this EXACT desktop puppy. Localized face edit only: foreground eye winks shut, other eye remains a friendly black oval, open smiling mouth with one SMALL rounded pink tongue protruding slightly down at the mouth corner. Tongue short and cute, simple black outline, no teeth or complex mouth anatomy. Cheeky harmless silly face, not aggressive. Preserve original head silhouette, nose, ear, tuft, red collar, torso, arms, tail, legs and feet EXACTLY in shape/location/scale. Same thick black contours, opaque white fill, full body on same square canvas. True alpha transparent background. No blush, added objects, text, effect marks, ground, shadow, watermark or sheet. Maintain stable head and foot anchors for animation.",
+  "revised_prompt": null,
+  "model": "gpt-image-2.5",
+  "background_requested": "transparent",
+  "reference_image": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\references\\desktop-puppy\\idle-master-20261004.png",
+  "path": "C:\\Users\\ton20\\Documents\\works\\projects\\image-generation-mcp\\output\\candidates\\imagegen-20261005T021515Z-9a84380ba197.png",
+  "width": 1254,
+  "height": 1254,
+  "alpha_min": 0,
+  "alpha_max": 255,
+  "sha256": "9892fc0403ea1e07a6d73de52263b8a1bdbb38dedffed5d07ead0116dee49dff",
+  "created_at": "2026-10-05T02:15:15.226625+00:00"
+}
