@@ -2,10 +2,12 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-10-07
+**Last updated:** 2026-10-08 (right-click AI managed worktree; main checkpoint remains 726d3da)
 **Latest verified step:** Snoopy animation runtime integration on `main`, based on checkpoint `087f966`. Fresh verification on 2026-10-07: 214/214 deterministic tests, 12/12 complete `Category=Ui` desktop tests (including animation playback and input injection), and Release solution build with 0 errors / 3 cached NU1900 warnings. Earlier app recompilation also emitted WFO0003 DPI-manifest warnings. A real app process was launched and UI Automation confirmed the pet window and idle image visible. See the animation integration section below.
 **Current phase:** Phase 4 in progress — offline statistics, monitor/DPI placement, WinForms tray and Snoopy animations are implemented. Manual Shell, OS session/power and multi-monitor/DPI acceptance remain pending; AI, reports and persistent settings are not implemented.
 **Current handoff:** Animation code, packaged assets, tests and this status are included in the current local commit. No push requested. Next: visual review of actual playback, then the manual Windows acceptance checklist.
+
+**AI worktree handoff — 2026-10-08:** The user prioritized a usable right-click AI vertical slice. Implemented in `C:\Users\ton20\.codex\worktrees\right-click-ai\desktop-puppy`, based on `726d3da`, not merged/pushed. The historical main status above is preserved. See the newest section below for scope and verification.
 **Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
 **Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
@@ -898,3 +900,26 @@ Next ordered operator steps: `docs/verification/windows-acceptance-checklist.md`
 - Startup greeting; idle rotation every seven seconds; single click shows smug, double click hit, right click rotates four specials, drag holds lifted pose then lands.
 - Fresh verification: 214/214 deterministic tests; 12/12 Category=Ui tests, including startup greeting, all four special peaks, hit recovery and idle return, plus existing drag/bubble/statistics checks. Release solution build succeeded with 0 errors / 3 cached NU1900 warnings on incremental build (earlier app rebuild also emitted WFO0003).
 - Initial sandbox test runs aborted due to testhost connection timeout; the successful runs used the interactive Windows environment. Manual hardware/Shell acceptance remains pending. Changes are included in the current local animation integration commit; no push was requested.
+
+## Right-click AI vertical slice — 2026-10-08
+
+Implemented in the managed `right-click-ai` worktree from source base `726d3da`. Main and its existing untracked directories remain unchanged; no merge or push was performed.
+
+- Added a WPF AI settings window, reachable from the pet AI button and tray. AI/right-click switches persist independently of provider-specific DPAPI current-user encrypted key blobs. Stored keys are not read back into the UI. Blank or corrupt/unreadable keys produce fixed notifications; no raw exceptions or provider bodies are logged.
+- Added independent AI SQLite tables, transactional idempotent initialization and 15-local-day retention using the existing cutoff policy. Tests prove coexistence with preexisting usage sessions and preservation of configuration/key blobs.
+- DeepSeek uses JSON mode and `deepseek-flash`, six candidates per batch, eight-second attempt timeout and up to five serial attempts. Accepted candidates accumulate until at least four; retries receive existing candidates and a variation number. Invalid full text is not stored. Jev uses official TypeSafe `/v1/systemone`, `jev-latest`, one Choice and five-second attempt timeouts. Jev retry does not regenerate DeepSeek candidates. Both use 1/2/4/8-second backoff; HTTP response bodies are capped at 64 KiB and redirects disabled.
+- Local validation checks 10–80 Unicode text elements, plain single-paragraph content, banned stock phrases, punctuation/emoji limits, six explicit styles, exact/near duplication and consecutive style repetition. Duplicate cutoff is NFKC-normalized letter/digit bigram Dice >= 0.75. These heuristics cannot prove semantic factual truth; prompts explicitly constrain scene grounding and treat titles as data. Live language-quality acceptance remains required.
+- Added a single in-flight right-click coordinator and a monotonic 15-second bubble deadline. Animations always run locally. Extra in-flight clicks do not queue. Expired/closed/replaced/hidden/fullscreen results are recorded without display; only actually displayed text enters repetition history. Disabled or unconfigured AI preserves existing speech. Notifications also obey ownership/deadline. Final API failure has no local speech fallback; exit cancels pending calls.
+- The foreground context observes the existing native watcher and refreshes, preserving the last external app/title when clicking the pet; no second hook or expanded data collection was added. Context is frozen per request and capped at 128 app-name / 512 title UTF-16 code units.
+- Fullscreen detection checks Shell exclusive Direct3D state plus visible, non-minimized, non-cloaked, unframed monitor-sized windows every 500 ms. Normal framed/maximized windows and desktop/shell/pet windows are excluded. Automatic fullscreen hiding and explicit user hiding are separate; statistics and in-flight requests continue. Results completed while suppressed do not replay on restoration.
+
+### Automated evidence and review
+
+- Clean serialized Release solution build: exit 0, 0 errors, 2 existing WFO0003 DPI-manifest warnings. Worktree restore used the NuGet cache and explicit nuget.org source with NuGet audit disabled; no fresh vulnerability-scan claim is made.
+- Complete deterministic suite: **260 passed, 0 failed, 0 skipped**. Coverage includes real eight-second cancellation/retry, partial candidate accumulation, malformed probabilities, actual Windows DPAPI round trip/corruption, old usage-table coexistence, retention, late completion and shutdown cancellation.
+- Independent read-only review found two P2 lifecycle defects: preflight removal of existing speech and late failure notices. Four new regression cases were observed failing before the fixes; the full suite passed afterward.
+- Desktop UI uses private database fixtures, including previously unisolated harness cases, so it cannot reuse real API keys or the ordinary user database. One full run passed 14/14. A later run had one startup discovery timeout (13 passed); the exact case passed alone afterward. The timeout cause is not established and is not described as fixed. Final full-run result is recorded below.
+- **Final complete `Category=Ui` rerun:** exit 0, **14 passed, 0 failed, 0 skipped**, 25 seconds, against the final Release executable after lifecycle/copy changes. The isolated case passed 1/1 in a separate run; it is not added to the full-suite count. The earlier startup timeout remains a recorded limitation.
+- Real online DeepSeek/Jev calls: **Not run** (no user-configured keys used). Real borderless/exclusive/multi-monitor fullscreen, tray/Explorer, lock/power and monitor/DPI hardware acceptance remain **Not run**. Unit geometry checks and UI smoke are not hardware acceptance.
+
+Current next action: run the worktree Release executable, configure both keys through AI settings, and perform isolated online right-click and real fullscreen acceptance. Preserve the original manual Windows acceptance backlog. Follow-up features are AI greetings/activities, reports, full settings, and startup registration.

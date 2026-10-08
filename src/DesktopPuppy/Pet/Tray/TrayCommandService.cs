@@ -67,6 +67,7 @@ public sealed class TrayCommandService : IDisposable
             case TrayIconCommand.ShowPet: _actions.ShowPet(); break;
             case TrayIconCommand.HidePet: _actions.HidePet(); break;
             case TrayIconCommand.OpenStatistics: _actions.OpenStatistics(); break;
+            case TrayIconCommand.OpenAiSettings: _actions.OpenAiSettings(); break;
             case TrayIconCommand.Exit:
                 _exitRequested = true;
                 _actions.ExitApplication();

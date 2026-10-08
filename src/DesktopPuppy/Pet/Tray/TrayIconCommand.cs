@@ -5,6 +5,7 @@ public enum TrayIconCommand
     ShowPet,
     HidePet,
     OpenStatistics,
+    OpenAiSettings,
     Exit
 }
 

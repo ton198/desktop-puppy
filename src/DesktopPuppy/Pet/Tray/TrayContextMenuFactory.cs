@@ -11,6 +11,7 @@ internal static class TrayContextMenuFactory
         AddItem(menu, "Show Desktop Puppy", TrayIconCommand.ShowPet);
         AddItem(menu, "Hide Desktop Puppy", TrayIconCommand.HidePet);
         AddItem(menu, "Usage Statistics", TrayIconCommand.OpenStatistics);
+        AddItem(menu, "AI 设置", TrayIconCommand.OpenAiSettings);
         menu.Items.Add(new ToolStripSeparator());
         AddItem(menu, "Exit Desktop Puppy", TrayIconCommand.Exit);
         return menu;

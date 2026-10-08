@@ -49,6 +49,9 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button Content="AI" Width="32" Style="{StaticResource ChromeButton}"
+                    ToolTip="AI 设置" AutomationProperties.AutomationId="AiSettingsButton"
+                    AutomationProperties.Name="打开 AI 设置" Click="AiSettingsButton_OnClick"/>
             <Button x:Name="StatisticsButton"
                     AutomationProperties.AutomationId="StatisticsButton"
                     AutomationProperties.Name="打开使用统计"
@@ -68,6 +71,9 @@
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="12,0,12,12">
+            <TextBlock x:Name="AiNotice" AutomationProperties.AutomationId="AiNotice"
+                       Panel.ZIndex="3" TextWrapping="Wrap" Background="#FFF8FAFC" Foreground="#FF334155"
+                       Padding="8" MaxWidth="225" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"/>
             <Border x:Name="BubbleBorder"
                     AutomationProperties.AutomationId="SpeechBubble"
                     Panel.ZIndex="2"

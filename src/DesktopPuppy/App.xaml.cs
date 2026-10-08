@@ -1,4 +1,10 @@
 using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
+using DesktopPuppy.Ai;
+using DesktopPuppy.Security;
+using DesktopPuppy.Pet.Ai;
+using System.Windows.Threading;
 using System.Threading;
 using Timer = System.Threading.Timer;
 using WpfApplication = System.Windows.Application;
@@ -29,6 +35,15 @@ public partial class App : WpfApplication
     private UsageStatisticsWindow? _usageStatisticsWindow;
     private Win32MonitorDisplayProvider? _monitorDisplayProvider;
     private PetWindowPlacementService? _petWindowPlacementService;
+    private ContextForegroundWatcher? _contextWatcher;
+    private AiSqliteStore? _aiStore;
+    private ApiKeyService? _apiKeys;
+    private AiSettingsWindow? _aiSettingsWindow;
+    private HttpClient? _aiHttp;
+    private DispatcherTimer? _fullscreenTimer;
+    private IFullscreenDetector? _fullscreenDetector;
+    private bool _lastFullscreen;
+    private Timer? _aiRetentionTimer;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -48,19 +63,28 @@ public partial class App : WpfApplication
         InitializePetWindowPlacement();
         _petWindow = new PetWindow(_petWindowPlacementService, _monitorDisplayProvider);
         _petWindow.StatisticsRequested += PetWindow_OnStatisticsRequested;
+        _petWindow.AiSettingsRequested += PetWindow_OnAiSettingsRequested;
         MainWindow = _petWindow;
-        _petWindow.Show();
+        InitializeAi();
+        InitializeFullscreen();
+        _petWindow.ShowFromUser();
 
-        _trayApplicationActions = new TrayApplicationActions(_petWindow, OpenOrActivateStatisticsWindow);
+        _trayApplicationActions = new TrayApplicationActions(_petWindow, OpenOrActivateStatisticsWindow, OpenOrActivateAiSettingsWindow);
         _trayCommandService = new TrayCommandService(new WinFormsTrayIconHost(), _trayApplicationActions);
         _trayCommandService.Start();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _fullscreenTimer?.Stop();
+        _aiRetentionTimer?.Dispose();
+        _petWindow?.AiCoordinator?.Dispose();
+        _aiHttp?.Dispose();
+        _aiSettingsWindow?.Close();
         if (_petWindow is not null)
         {
             _petWindow.StatisticsRequested -= PetWindow_OnStatisticsRequested;
+            _petWindow.AiSettingsRequested -= PetWindow_OnAiSettingsRequested;
         }
 
         try
@@ -176,7 +200,8 @@ public partial class App : WpfApplication
 
     private void StartUsageTracking()
     {
-        var watcher = new WinEventForegroundWatcher();
+        var watcher = new ContextForegroundWatcher(new WinEventForegroundWatcher(), "DesktopPuppy");
+        _contextWatcher = watcher;
         SystemEventsSessionPowerEventSource? sessionPowerEventSource = null;
         try
         {
@@ -281,6 +306,69 @@ public partial class App : WpfApplication
     }
 
     private void PetWindow_OnStatisticsRequested(object? sender, EventArgs e) => OpenOrActivateStatisticsWindow();
+
+    private void PetWindow_OnAiSettingsRequested(object? sender, EventArgs e) => OpenOrActivateAiSettingsWindow();
+
+    private void InitializeAi()
+    {
+        try
+        {
+            var path = _usageStore?.DatabasePath ?? Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH");
+            if (string.IsNullOrWhiteSpace(path)) path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DesktopPuppy", "desktop-puppy.db");
+            _aiStore = new AiSqliteStore(path);
+            _aiStore.Initialize();
+            _apiKeys = new ApiKeyService(_aiStore, new DpapiApiKeyProtector());
+            _aiHttp = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
+            var pipeline = new AiPipeline(new DeepSeekContentProvider(_aiHttp, () => _apiKeys.Get(AiProvider.DeepSeek)), new JevDecisionProvider(_aiHttp, () => _apiKeys.Get(AiProvider.Jev)), new AiDelay());
+            var monotonic = Stopwatch.StartNew();
+            _petWindow!.AiCoordinator = new RightClickAiCoordinator(_aiStore, _apiKeys, pipeline, _petWindow, () => _contextWatcher?.LastExternal, () => DateTimeOffset.UtcNow, () => monotonic.Elapsed);
+            var retention = new UsageRetentionCoordinator(_aiStore.PruneBefore, TimeZoneInfo.Local);
+            _aiRetentionTimer = new Timer(_ =>
+            {
+                try { retention.CheckAndPrune(DateTimeOffset.UtcNow); } catch { /* Retry on the next check; no raw diagnostics. */ }
+            }, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        }
+        catch
+        {
+            _aiStore = null;
+            _apiKeys = null;
+            _aiHttp?.Dispose();
+            _aiHttp = null;
+            TrayDiagnostics.WriteFixed("AI initialization failed.");
+        }
+    }
+
+    private void InitializeFullscreen()
+    {
+        if (_monitorDisplayProvider is null) return;
+        _fullscreenDetector = new Win32FullscreenDetector(_monitorDisplayProvider);
+        _petWindow!.FullscreenNow = CheckFullscreen;
+        _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _fullscreenTimer.Tick += (_, _) => _petWindow.SetFullscreen(CheckFullscreen());
+        _petWindow.SetFullscreen(CheckFullscreen());
+        _fullscreenTimer.Start();
+    }
+
+    private bool CheckFullscreen()
+    {
+        try { _lastFullscreen = _fullscreenDetector?.IsFullscreen() ?? false; } catch { /* Preserve last observation on a transient failure. */ }
+        return _lastFullscreen;
+    }
+
+    private void OpenOrActivateAiSettingsWindow()
+    {
+        if (_aiStore is null || _apiKeys is null) { _petWindow?.NotifyAi("AI 存储暂时不可用。"); return; }
+        if (_aiSettingsWindow is not null)
+        {
+            if (_aiSettingsWindow.WindowState == WindowState.Minimized) _aiSettingsWindow.WindowState = WindowState.Normal;
+            _aiSettingsWindow.Activate();
+            return;
+        }
+        var window = new AiSettingsWindow(_aiStore, _apiKeys);
+        window.Closed += (_, _) => _aiSettingsWindow = null;
+        _aiSettingsWindow = window;
+        window.Show();
+    }
 
     private void OpenOrActivateStatisticsWindow()
     {

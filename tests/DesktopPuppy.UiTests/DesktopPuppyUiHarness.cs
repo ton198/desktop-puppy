@@ -15,14 +15,23 @@ public sealed class DesktopPuppyUiHarness : IDisposable
     private readonly Process _process;
     private IntPtr _windowHandle;
     private bool _disposed;
+    private readonly string? _ownedRunDirectory;
 
-    private DesktopPuppyUiHarness(Process process)
+    private DesktopPuppyUiHarness(Process process, string? ownedRunDirectory = null)
     {
         _process = process;
+        _ownedRunDirectory = ownedRunDirectory;
     }
 
     public static DesktopPuppyUiHarness Start(string executablePath, string? usageDatabasePath = null)
     {
+        string? ownedRunDirectory = null;
+        if (usageDatabasePath is null)
+        {
+            ownedRunDirectory = Path.Combine(Path.GetTempPath(), "DesktopPuppy-ui-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(ownedRunDirectory);
+            usageDatabasePath = Path.Combine(ownedRunDirectory, "usage.db");
+        }
         var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
@@ -40,7 +49,7 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             throw new InvalidOperationException($"Could not start '{executablePath}'.");
         }
 
-        return new DesktopPuppyUiHarness(process);
+        return new DesktopPuppyUiHarness(process, ownedRunDirectory);
     }
 
     public AutomationElement WaitForPetWindow(TimeSpan timeout)
@@ -346,6 +355,15 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         SendMouseButton(MouseButton.Right, pressed: false);
     }
 
+    public void SingleClickCenter()
+    {
+        BringToFront();
+        var center = GetPetInteractionPoint();
+        SetCursorPos(center.X, center.Y);
+        SendMouseButton(MouseButton.Left, pressed: true);
+        SendMouseButton(MouseButton.Left, pressed: false);
+    }
+
     public void DoubleClickCenter()
     {
         BringToFront();
@@ -458,6 +476,10 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             }
         }
 
+        if (_ownedRunDirectory is not null && _process.HasExited)
+        {
+            Directory.Delete(_ownedRunDirectory, recursive: true);
+        }
         _process.Dispose();
     }
 

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
+using DesktopPuppy.Ai;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Input;
@@ -19,7 +20,7 @@ using DesktopPuppy.Pet.Tray;
 
 namespace DesktopPuppy.Pet;
 
-public partial class PetWindow : Window, ITrayPetWindow
+public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 {
     [DllImport("user32.dll")]
     private static extern uint GetDoubleClickTime();
@@ -29,7 +30,7 @@ public partial class PetWindow : Window, ITrayPetWindow
         "我看见你了。别装忙。",
         "点击成功，今天也被我盯上了。",
         "这一下算你赢半秒。",
-        "右键是秘密通道，暂时离线。"
+        "右键是秘密通道，试试看。"
     ];
 
     private readonly DispatcherTimer _animationTimer;
@@ -49,12 +50,40 @@ public partial class PetWindow : Window, ITrayPetWindow
     private bool _closed;
     private int _lineIndex;
     private bool _dragStarted;
+    private readonly PetVisibilityState _visibility = new();
+    private readonly DispatcherTimer _aiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private TimeSpan _noticeDeadline;
+    public RightClickAiCoordinator? AiCoordinator { get; set; }
+    public Func<bool>? FullscreenNow { get; set; }
+    public event EventHandler? AiSettingsRequested;
+    public bool CanShowAi => !_closed && IsVisible && _visibility.ShouldShow && !(FullscreenNow?.Invoke() ?? false);
+    void IRightClickAiView.ShowPlaceholder() => SetBubbleText("想一句调皮的话……");
+    void IRightClickAiView.ShowAiText(string text) => SetBubbleText(text);
+    void IRightClickAiView.RemovePlaceholder() => BubbleBorder.Visibility = Visibility.Collapsed;
+    public void NotifyAi(string text)
+    {
+        if (_closed || !IsVisible) return;
+        AiNotice.Text = text;
+        System.Windows.Automation.AutomationProperties.SetName(AiNotice, text);
+        AiNotice.Visibility = Visibility.Visible;
+        _noticeDeadline = _animationClock.Elapsed + TimeSpan.FromSeconds(8);
+    }
+    public void ShowFromUser() { _visibility.SetUserHidden(false); ApplyVisibility(); }
+    void ITrayPetWindow.Show() => ShowFromUser();
+    void ITrayPetWindow.Hide() { _visibility.SetUserHidden(true); ApplyVisibility(); }
+    public void SetFullscreen(bool fullscreen) { _visibility.SetFullscreen(fullscreen); ApplyVisibility(); }
+    private void ApplyVisibility()
+    {
+        if (_closed) return;
+        if (_visibility.ShouldShow) { if (!IsVisible) Show(); }
+        else { AiCoordinator?.InvalidateBubble(); AiNotice.Visibility = Visibility.Collapsed; if (IsVisible) Hide(); }
+    }
 
     bool ITrayPetWindow.IsMinimized => WindowState == WindowState.Minimized;
 
     void ITrayPetWindow.Restore() => WindowState = WindowState.Normal;
 
-    void ITrayPetWindow.Activate() => _ = Activate();
+    void ITrayPetWindow.Activate() { if (_visibility.ShouldShow) _ = Activate(); }
 
     public event EventHandler? StatisticsRequested;
 
@@ -75,6 +104,12 @@ public partial class PetWindow : Window, ITrayPetWindow
         _animationTimer.Tick += AnimationTimer_OnTick;
         PlayAnimation("greeting");
         _animationTimer.Start();
+        _aiTimer.Tick += (_, _) =>
+        {
+            AiCoordinator?.Advance();
+            if (_animationClock.Elapsed >= _noticeDeadline) AiNotice.Visibility = Visibility.Collapsed;
+        };
+        _aiTimer.Start();
         _placementService = placementService;
         _monitorDisplayProvider = monitorDisplayProvider;
 
@@ -104,6 +139,8 @@ public partial class PetWindow : Window, ITrayPetWindow
     {
         _interactionTimer.Stop();
         _animationTimer.Stop();
+        _aiTimer.Stop();
+        AiCoordinator?.Dispose();
         base.OnClosing(e);
     }
 
@@ -295,12 +332,13 @@ public partial class PetWindow : Window, ITrayPetWindow
                 break;
             case PetInteractionEventType.Hit:
                 PlayAnimation("hit");
-                ShowBubble("嗷！轻点，我还在离线模式里努力。");
+                ShowBubble("嗷！轻点，我的威风差点掉地上。");
                 break;
             case PetInteractionEventType.RightClick:
                 string[] specials = ["special-tongue", "special-glance", "special-smile", "special-classic"];
                 PlayAnimation(specials[_specialIndex++ % specials.Length]);
-                ShowBubble(LocalLines[^1]);
+                if (AiCoordinator is not null) _ = AiCoordinator.RightClickAsync();
+                else NotifyAi("AI 服务暂时不可用，请检查 AI 设置。");
                 break;
             case PetInteractionEventType.DragStarted:
                 _dragStarted = true;
@@ -373,12 +411,20 @@ public partial class PetWindow : Window, ITrayPetWindow
 
     private void ShowBubble(string text)
     {
+        AiCoordinator?.InvalidateBubble();
+        SetBubbleText(text);
+    }
+
+    private void SetBubbleText(string text)
+    {
         BubbleText.Text = text;
+        System.Windows.Automation.AutomationProperties.SetName(BubbleText, text);
         BubbleBorder.Visibility = Visibility.Visible;
     }
 
     private void BubbleCloseButton_OnClick(object sender, RoutedEventArgs e)
     {
+        AiCoordinator?.InvalidateBubble();
         BubbleBorder.Visibility = Visibility.Collapsed;
         e.Handled = true;
     }
@@ -386,6 +432,12 @@ public partial class PetWindow : Window, ITrayPetWindow
     private void StatisticsButton_OnClick(object sender, RoutedEventArgs e)
     {
         StatisticsRequested?.Invoke(this, EventArgs.Empty);
+        e.Handled = true;
+    }
+
+    private void AiSettingsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        AiSettingsRequested?.Invoke(this, EventArgs.Empty);
         e.Handled = true;
     }
 

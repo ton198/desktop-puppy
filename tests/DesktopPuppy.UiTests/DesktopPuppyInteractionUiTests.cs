@@ -7,17 +7,15 @@ public sealed class DesktopPuppyInteractionUiTests
 {
     [Fact]
     [Trait("Category", "Ui")]
-    public void Right_click_shows_a_closable_speech_bubble()
+    public void Right_click_without_keys_notifies_without_fallback_speech()
     {
         using var harness = StartHarness();
         var window = harness.WaitForPetWindow(TimeSpan.FromSeconds(5));
 
         harness.RightClickCenter();
 
-        var bubble = harness.WaitForAutomationId(window, "SpeechBubbleText", TimeSpan.FromSeconds(2));
-        Assert.False(bubble.Current.IsOffscreen);
-        var closeBubbleButton = harness.FindByAutomationId(window, "CloseBubbleButton");
-        harness.Invoke(closeBubbleButton);
+        var notice = harness.WaitForAutomationName(window, "AiNotice", name => name.Contains("配置"), TimeSpan.FromSeconds(5));
+        Assert.Contains("Key", notice);
         harness.WaitForAutomationIdToDisappear(window, "SpeechBubbleText", TimeSpan.FromSeconds(2));
     }
 
