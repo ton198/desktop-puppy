@@ -17,6 +17,8 @@ public sealed class AiHttpTests
         var provider = new DeepSeekContentProvider(new HttpClient(handler), () => key);
         var result = await provider.GenerateAsync(new("editor", "test", "day", []), [], 2, CancellationToken.None);
         Assert.Equal(6, result.Count); Assert.Contains("deepseek-flash", handler.Body); Assert.Contains("json_object", handler.Body); Assert.DoesNotContain(key, handler.Body);
+        using var requestJson = System.Text.Json.JsonDocument.Parse(handler.Body);
+        Assert.Equal("disabled", requestJson.RootElement.GetProperty("thinking").GetProperty("type").GetString());
         Assert.Equal("https://api.deepseek.com/chat/completions", handler.Url); Assert.Equal(key, handler.Auth);
     }
 

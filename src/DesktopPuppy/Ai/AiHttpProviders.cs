@@ -37,6 +37,7 @@ public sealed class DeepSeekContentProvider(HttpClient client, Func<string?> rea
         var body = new
         {
             model = "deepseek-flash",
+            thinking = new { type = "disabled" },
             stream = false,
             response_format = new { type = "json_object" },
             max_tokens = 1800,
