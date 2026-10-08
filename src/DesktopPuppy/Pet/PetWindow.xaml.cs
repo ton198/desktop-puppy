@@ -10,6 +10,9 @@ using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
 using WpfButton = System.Windows.Controls.Button;
 using System.Windows.Threading;
 using DesktopPuppy.Native;
+using DesktopPuppy.Pet.Animation;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using DesktopPuppy.Pet.Interaction;
 using DesktopPuppy.Pet.Placement;
 using DesktopPuppy.Pet.Tray;
@@ -29,6 +32,14 @@ public partial class PetWindow : Window, ITrayPetWindow
         "右键是秘密通道，暂时离线。"
     ];
 
+    private readonly DispatcherTimer _animationTimer;
+    private readonly PetAnimationPlayer _animationPlayer = new();
+    private readonly Stopwatch _animationClock = Stopwatch.StartNew();
+    private readonly Dictionary<string, ImageSource> _animationImages = new();
+    private TimeSpan _nextIdleAction = TimeSpan.FromSeconds(5);
+    private int _specialIndex;
+    private int _idleIndex;
+    private string _currentFrame = "";
     private readonly DispatcherTimer _interactionTimer;
     private readonly InteractionController _interactionController;
     private readonly PetWindowPlacementService? _placementService;
@@ -52,6 +63,18 @@ public partial class PetWindow : Window, ITrayPetWindow
         IMonitorDisplayProvider? monitorDisplayProvider = null)
     {
         InitializeComponent();
+        foreach (var name in PetAnimationPlayer.Sequences.Values.SelectMany(frames => frames).Select(frame => frame.Name).Append("idle").Distinct())
+        {
+            var bitmap = new BitmapImage(new Uri($"pack://application:,,,/Pet/Animation/Assets/{name}.png"));
+            // All frames share one crop, preserving alignment between poses.
+            var cropped = new CroppedBitmap(bitmap, new Int32Rect(250, 80, 800, 1120));
+            cropped.Freeze();
+            _animationImages.Add(name, cropped);
+        }
+        _animationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _animationTimer.Tick += AnimationTimer_OnTick;
+        PlayAnimation("greeting");
+        _animationTimer.Start();
         _placementService = placementService;
         _monitorDisplayProvider = monitorDisplayProvider;
 
@@ -80,6 +103,7 @@ public partial class PetWindow : Window, ITrayPetWindow
     protected override void OnClosing(CancelEventArgs e)
     {
         _interactionTimer.Stop();
+        _animationTimer.Stop();
         base.OnClosing(e);
     }
 
@@ -266,16 +290,21 @@ public partial class PetWindow : Window, ITrayPetWindow
         switch (interactionEvent.Type)
         {
             case PetInteractionEventType.SingleClick:
+                PlayAnimation("click");
                 ShowBubble(LocalLines[_lineIndex++ % LocalLines.Length]);
                 break;
             case PetInteractionEventType.Hit:
+                PlayAnimation("hit");
                 ShowBubble("嗷！轻点，我还在离线模式里努力。");
                 break;
             case PetInteractionEventType.RightClick:
+                string[] specials = ["special-tongue", "special-glance", "special-smile", "special-classic"];
+                PlayAnimation(specials[_specialIndex++ % specials.Length]);
                 ShowBubble(LocalLines[^1]);
                 break;
             case PetInteractionEventType.DragStarted:
                 _dragStarted = true;
+                PlayAnimation("drag");
                 _interactionTimer.Stop();
                 ReleaseMouseCapture();
                 try
@@ -286,11 +315,45 @@ public partial class PetWindow : Window, ITrayPetWindow
                 {
                     // The window may close while a drag is being initiated.
                 }
+                finally
+                {
+                    _interactionController.PointerReleased(interactionEvent.Position, DateTimeOffset.Now);
+                    _dragStarted = false;
+                    if (!_closed) PlayAnimation("landing");
+                }
                 break;
             case PetInteractionEventType.DragCompleted:
+                PlayAnimation("landing");
                 _dragStarted = false;
                 break;
         }
+    }
+
+    private void PlayAnimation(string name)
+    {
+        _animationPlayer.Play(name, _animationClock.Elapsed);
+        _nextIdleAction = _animationClock.Elapsed + TimeSpan.FromSeconds(7);
+        RenderAnimationFrame();
+    }
+
+    private void AnimationTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (!IsVisible) return;
+        RenderAnimationFrame();
+        if (!_dragStarted && _currentFrame == "idle" && _animationClock.Elapsed >= _nextIdleAction)
+        {
+            string[] idleActions = ["blink", "blink", "happy", "blink", "greeting"];
+            PlayAnimation(idleActions[_idleIndex++ % idleActions.Length]);
+        }
+    }
+
+    private void RenderAnimationFrame()
+    {
+        var frame = _animationPlayer.FrameAt(_animationClock.Elapsed);
+        if (frame == _currentFrame) return;
+        _currentFrame = frame;
+        PetImage.Source = _animationImages[frame];
+        System.Windows.Automation.AutomationProperties.SetName(PetImage, frame);
     }
 
     private void SyncInteractionTimer()

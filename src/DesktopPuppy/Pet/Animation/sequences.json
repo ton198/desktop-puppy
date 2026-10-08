@@ -1,0 +1,192 @@
+{
+  "greeting": [
+    {
+      "Name": "greeting-start",
+      "DurationMs": 90
+    },
+    {
+      "Name": "greeting-mid",
+      "DurationMs": 100
+    },
+    {
+      "Name": "greeting-raised",
+      "DurationMs": 130
+    },
+    {
+      "Name": "greeting-in",
+      "DurationMs": 130
+    },
+    {
+      "Name": "greeting-raised",
+      "DurationMs": 90
+    },
+    {
+      "Name": "greeting-out",
+      "DurationMs": 130
+    },
+    {
+      "Name": "greeting-raised",
+      "DurationMs": 90
+    },
+    {
+      "Name": "greeting-in",
+      "DurationMs": 130
+    },
+    {
+      "Name": "greeting-raised",
+      "DurationMs": 90
+    },
+    {
+      "Name": "greeting-out",
+      "DurationMs": 130
+    },
+    {
+      "Name": "greeting-raised",
+      "DurationMs": 140
+    },
+    {
+      "Name": "greeting-mid",
+      "DurationMs": 100
+    },
+    {
+      "Name": "greeting-start",
+      "DurationMs": 90
+    }
+  ],
+  "special-tongue": [
+    {
+      "Name": "tongue-ready",
+      "DurationMs": 120
+    },
+    {
+      "Name": "tongue-wink",
+      "DurationMs": 100
+    },
+    {
+      "Name": "tongue-short",
+      "DurationMs": 90
+    },
+    {
+      "Name": "tongue-peak",
+      "DurationMs": 450
+    },
+    {
+      "Name": "tongue-short",
+      "DurationMs": 90
+    },
+    {
+      "Name": "tongue-wink",
+      "DurationMs": 100
+    },
+    {
+      "Name": "tongue-ready",
+      "DurationMs": 120
+    }
+  ],
+  "special-glance": [
+    {
+      "Name": "glance-entry",
+      "DurationMs": 120
+    },
+    {
+      "Name": "glance-peak",
+      "DurationMs": 170
+    },
+    {
+      "Name": "glance-brow",
+      "DurationMs": 450
+    },
+    {
+      "Name": "glance-peak",
+      "DurationMs": 170
+    },
+    {
+      "Name": "glance-entry",
+      "DurationMs": 120
+    }
+  ],
+  "special-smile": [
+    {
+      "Name": "smile-half",
+      "DurationMs": 100
+    },
+    {
+      "Name": "smile-peak",
+      "DurationMs": 450
+    },
+    {
+      "Name": "smile-release",
+      "DurationMs": 140
+    },
+    {
+      "Name": "smile-half",
+      "DurationMs": 100
+    }
+  ],
+  "blink": [
+    {
+      "Name": "blink-half",
+      "DurationMs": 60
+    },
+    {
+      "Name": "blink-closed",
+      "DurationMs": 110
+    },
+    {
+      "Name": "blink-half",
+      "DurationMs": 60
+    }
+  ],
+  "happy": [
+    {
+      "Name": "happy",
+      "DurationMs": 650
+    }
+  ],
+  "click": [
+    {
+      "Name": "click-smug",
+      "DurationMs": 750
+    }
+  ],
+  "hit": [
+    {
+      "Name": "hit-startle",
+      "DurationMs": 120
+    },
+    {
+      "Name": "hit-recoil",
+      "DurationMs": 180
+    },
+    {
+      "Name": "hit-recover",
+      "DurationMs": 550
+    }
+  ],
+  "drag": [
+    {
+      "Name": "drag-lift",
+      "DurationMs": 1000
+    }
+  ],
+  "landing": [
+    {
+      "Name": "landing",
+      "DurationMs": 180
+    }
+  ],
+  "special-classic": [
+    {
+      "Name": "special-anticipate",
+      "DurationMs": 180
+    },
+    {
+      "Name": "special-tongue",
+      "DurationMs": 500
+    },
+    {
+      "Name": "special-settle",
+      "DurationMs": 220
+    }
+  ]
+}

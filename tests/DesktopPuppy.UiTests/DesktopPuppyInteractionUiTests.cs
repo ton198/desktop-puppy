@@ -51,6 +51,25 @@ public sealed class DesktopPuppyInteractionUiTests
         Assert.NotEqual(before.Top, after.Top);
     }
 
+    [Fact]
+    [Trait("Category", "Ui")]
+    public void Pet_plays_all_special_sequences_and_returns_to_idle()
+    {
+        using var harness = StartHarness();
+        var window = harness.WaitForPetWindow(TimeSpan.FromSeconds(5));
+        harness.WaitForAutomationName(window, "PetAnimation", name => name == "greeting-raised", TimeSpan.FromSeconds(4));
+        harness.WaitForAutomationName(window, "PetAnimation", name => name == "idle", TimeSpan.FromSeconds(4));
+        foreach (var peak in new[] { "tongue-peak", "glance-brow", "smile-peak", "special-tongue" })
+        {
+            harness.RightClickCenter();
+            harness.WaitForAutomationName(window, "PetAnimation", name => name == peak, TimeSpan.FromSeconds(3));
+            harness.WaitForAutomationName(window, "PetAnimation", name => name == "idle", TimeSpan.FromSeconds(3));
+        }
+        harness.DoubleClickCenter();
+        harness.WaitForAutomationName(window, "PetAnimation", name => name == "hit-recover", TimeSpan.FromSeconds(3));
+        harness.WaitForAutomationName(window, "PetAnimation", name => name == "idle", TimeSpan.FromSeconds(3));
+    }
+
     private static DesktopPuppyUiHarness StartHarness()
     {
         var executable = Environment.GetEnvironmentVariable("DESKTOP_PUPPY_EXE");

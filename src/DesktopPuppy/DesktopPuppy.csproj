@@ -10,6 +10,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="Pet\Animation\Assets\*.png" />
+    <EmbeddedResource Include="Pet\Animation\sequences.json" LogicalName="DesktopPuppy.Animation.sequences.json" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
     <EmbeddedResource Include="Pet\Tray\Assets\DesktopPuppyTray.ico">

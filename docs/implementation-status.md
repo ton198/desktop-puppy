@@ -2,9 +2,10 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-10-01
-**Latest verified step:** Approved statistics-correctness fixes verified in the main working tree based on `ec1c241` (uncommitted): 212/212 deterministic tests, serialized Release solution build with 0 errors / 5 warnings, and 9/9 selected non-input-injecting UI tests including real-timer refresh. Full input-injecting UI and manual TRAY/OS/display acceptance remain **Not run**. See the 2026-10-01 section below.
-**Current phase:** Phase 4 in progress — usage statistics, native monitor/DPI placement, and the built-in WinForms tray are implemented; operator tray and hardware acceptance remain pending.
+**Last updated:** 2026-10-07
+**Latest verified step:** Snoopy animation runtime integration on `main`, based on checkpoint `087f966`. Fresh verification on 2026-10-07: 214/214 deterministic tests, 12/12 complete `Category=Ui` desktop tests (including animation playback and input injection), and Release solution build with 0 errors / 3 cached NU1900 warnings. Earlier app recompilation also emitted WFO0003 DPI-manifest warnings. A real app process was launched and UI Automation confirmed the pet window and idle image visible. See the animation integration section below.
+**Current phase:** Phase 4 in progress — offline statistics, monitor/DPI placement, WinForms tray and Snoopy animations are implemented. Manual Shell, OS session/power and multi-monitor/DPI acceptance remain pending; AI, reports and persistent settings are not implemented.
+**Current handoff:** Animation code, packaged assets, tests and this status are included in the current local commit. No push requested. Next: visual review of actual playback, then the manual Windows acceptance checklist.
 **Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
 **Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
@@ -889,3 +890,11 @@ Limits: checkpoints recover confirmed title detail only. An abrupt termination c
 
 Evidence and commands: `docs/verification/2026-10-01-statistics-correctness.md`.
 Next ordered operator steps: `docs/verification/windows-acceptance-checklist.md`. **TRAY-01–04, actual lock/unlock/suspend/resume, E2E-DISPLAY-01–02, and complete input-injecting UI regression remain Not run.** The next stage requires the operator's real Shell/OS/hardware actions; neither unit nor selected UI results substitutes for them.
+
+## Animation runtime integration — 2026-10-07
+
+- Integrated the saved Snoopy frames as packaged WPF resources; source and review files remain intact. One shared crop (250,80,800,1120) and display size preserve alignment.
+- Runtime actions: idle, blink, happy, greeting, click-smug, hit-startle/recoil/recover, held drag-lift, landing, special-tongue/glance/smile and classic anticipate/tongue/settle. New interaction interrupts playback; completed sequences return to idle. Corrected drag release after the native DragMove modal loop.
+- Startup greeting; idle rotation every seven seconds; single click shows smug, double click hit, right click rotates four specials, drag holds lifted pose then lands.
+- Fresh verification: 214/214 deterministic tests; 12/12 Category=Ui tests, including startup greeting, all four special peaks, hit recovery and idle return, plus existing drag/bubble/statistics checks. Release solution build succeeded with 0 errors / 3 cached NU1900 warnings on incremental build (earlier app rebuild also emitted WFO0003).
+- Initial sandbox test runs aborted due to testhost connection timeout; the successful runs used the interactive Windows environment. Manual hardware/Shell acceptance remains pending. Changes are included in the current local animation integration commit; no push was requested.

@@ -103,43 +103,10 @@
                 </Grid>
             </Border>
 
-            <Grid Margin="0,42,0,0" HorizontalAlignment="Center" VerticalAlignment="Bottom">
-                <Ellipse Width="132"
-                         Height="92"
-                         Fill="#FFF5B971"
-                         Stroke="#FF7C3F20"
-                         StrokeThickness="3" />
-                <Ellipse Width="100" Height="72" Fill="#FFF7C98B" />
-
-                <Polygon Points="55,24 18,0 24,50"
-                         Fill="#FFE0A15B"
-                         Stroke="#FF7C3F20"
-                         StrokeThickness="3" />
-                <Polygon Points="77,24 114,0 108,50"
-                         Fill="#FFE0A15B"
-                         Stroke="#FF7C3F20"
-                         StrokeThickness="3" />
-
-                <Ellipse Width="11" Height="16" Fill="#FF172033" Margin="-29,-8,0,0" />
-                <Ellipse Width="11" Height="16" Fill="#FF172033" Margin="29,-8,0,0" />
-                <Ellipse Width="18" Height="12" Fill="#FF172033" Margin="0,17,0,0" />
-                <Path Data="M -19,30 Q 0,48 19,30"
-                      Stroke="#FF172033"
-                      StrokeThickness="3"
-                      Fill="Transparent"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" />
-                <Ellipse Width="13" Height="9" Fill="#FFE47A6A" Margin="-51,16,0,0" />
-                <Ellipse Width="13" Height="9" Fill="#FFE47A6A" Margin="51,16,0,0" />
-
-                <TextBlock Text="OFFLINE"
-                           Foreground="#B83B261C"
-                           FontSize="10"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Bottom"
-                           Margin="0,0,0,10" />
-            </Grid>
+            <Image x:Name="PetImage" Width="132" Height="132"
+                   Margin="0,34,0,0" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                   Stretch="Uniform" AutomationProperties.AutomationId="PetAnimation"
+                   AutomationProperties.Name="idle" />
         </Grid>
     </Grid>
 </Window>
