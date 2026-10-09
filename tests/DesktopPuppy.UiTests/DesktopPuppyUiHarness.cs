@@ -381,12 +381,18 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         BringToFront();
         SetCursorPos(start.X, start.Y);
         SendMouseButton(MouseButton.Left, pressed: true);
-        WaitForWindowMouseCapture(TimeSpan.FromSeconds(1));
-        SetCursorPos(start.X + 20, start.Y);
-        Thread.Sleep(100);
-        SetCursorPos(end.X, end.Y);
-        Thread.Sleep(100);
-        SendMouseButton(MouseButton.Left, pressed: false);
+        try
+        {
+            WaitForWindowMouseCapture(TimeSpan.FromSeconds(1));
+            SetCursorPos(start.X + 20, start.Y);
+            Thread.Sleep(100);
+            SetCursorPos(end.X, end.Y);
+            Thread.Sleep(100);
+        }
+        finally
+        {
+            SendMouseButton(MouseButton.Left, pressed: false);
+        }
     }
 
     private void WaitForWindowMouseCapture(TimeSpan timeout)

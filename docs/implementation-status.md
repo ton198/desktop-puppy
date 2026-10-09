@@ -2,12 +2,12 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-10-08 (right-click AI managed worktree; main checkpoint remains 726d3da)
-**Latest verified step:** Snoopy animation runtime integration on `main`, based on checkpoint `087f966`. Fresh verification on 2026-10-07: 214/214 deterministic tests, 12/12 complete `Category=Ui` desktop tests (including animation playback and input injection), and Release solution build with 0 errors / 3 cached NU1900 warnings. Earlier app recompilation also emitted WFO0003 DPI-manifest warnings. A real app process was launched and UI Automation confirmed the pet window and idle image visible. See the animation integration section below.
-**Current phase:** Phase 4 in progress — offline statistics, monitor/DPI placement, WinForms tray and Snoopy animations are implemented. Manual Shell, OS session/power and multi-monitor/DPI acceptance remain pending; AI, reports and persistent settings are not implemented.
-**Current handoff:** Animation code, packaged assets, tests and this status are included in the current local commit. No push requested. Next: visual review of actual playback, then the manual Windows acceptance checklist.
+**Last updated:** 2026-10-08 (45-degree left/right edge docking integrated on local main; previous checkpoint `12a6f8c`)
+**Latest verified step:** Edge docking Release solution build: 0 errors / 2 existing WFO0003 warnings; separate UI-project build: 0 errors / 0 warnings. Complete deterministic suite: 269 passed; complete `Category=Ui` suite: 16 passed, 0 failed, 0 skipped (35 seconds). See `docs/verification/2026-10-08-edge-docking.md`.
+**Current phase:** Phase 4 in progress — offline statistics, monitor/DPI placement, tray, Snoopy animations, right-click AI with persistent AI settings, fullscreen suppression and edge docking are implemented. Reports, AI greetings/activities, complete settings and startup registration remain future features; real Shell/OS/multi-monitor hardware acceptance remains pending.
+**Current handoff:** The user approved the 45-degree edge sprites, accepted the running implementation, and requested local integration. Runtime, assets, tests and verification records are included in the local main integration commit. No push performed. Next: remaining Windows hardware/Shell checklist, then AI greetings/activities.
 
-**AI worktree handoff — 2026-10-08:** The user prioritized a usable right-click AI vertical slice. Implemented in `C:\Users\ton20\.codex\worktrees\right-click-ai\desktop-puppy`, based on `726d3da`, not merged/pushed. The historical main status above is preserved. See the newest section below for scope and verification.
+**AI integration — 2026-10-08:** The right-click AI worktree was fast-forward merged into local main and verified at `12a6f8c`; no push performed. Historical worktree checkpoints below describe their state at the time.
 **Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
 **Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
@@ -931,3 +931,10 @@ Current next action: real fullscreen and remaining Windows hardware/Shell accept
 - Fresh merged-tree Release solution build: exit 0, **0 errors / 2 existing WFO0003 DPI warnings**. Separate UI-project build: exit 0, **0 errors / 0 warnings**.
 - Fresh complete deterministic tests on main: **260 passed, 0 failed, 0 skipped**. Complete `Category=Ui` regression against main's Release executable: **14 passed, 0 failed, 0 skipped**, 24 seconds, with isolated fixture databases.
 - The first UI invocation lacked `DESKTOP_PUPPY_EXE` and failed fixture preconditions (13 failed / 1 passed); it did not establish an application regression. The complete rerun with the main executable explicitly configured passed as above. No real Shell/fullscreen/lock/power/DPI hardware acceptance is inferred from these tests.
+
+## Left/right edge docking integration — 2026-10-08
+
+- User approved the 45-degree sprites before implementation and accepted the running feature with “可以，合并吧”. The changes were already in the primary main checkout, so local integration records them directly as a commit on main; no synthetic branch merge or push is needed.
+- Added half-head left/right docking with a 24 DIP threshold, 250ms reveal/collapse and 800ms pointer-leave delay; bubbles protect expansion. Captured half-head dragging preserves the grab anchor, including DPI-aware geometry and capture-loss cleanup. Working-area clipping prevents hidden body spill into adjacent monitors.
+- Full pre-integration evidence: Release solution build 0 errors / 2 existing WFO0003 warnings, separate UI build 0 errors / 0 warnings, 269 deterministic tests and 16 complete Category=Ui desktop tests passed. Commit-time deterministic rerun passed 269/269. UI regression was not repeated for documentation-only integration, and the restarted user pet remained running.
+- Evidence: `docs/verification/2026-10-08-edge-docking.md`. User acceptance does not independently establish mixed-DPI, display-removal, side-taskbar or complete Windows Shell/OS acceptance.

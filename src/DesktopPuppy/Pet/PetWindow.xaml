@@ -42,13 +42,13 @@
         </Style>
     </Window.Resources>
 
-    <Grid AutomationProperties.AutomationId="PetSurface">
+    <Grid x:Name="PetRoot" ClipToBounds="True" AutomationProperties.AutomationId="PetSurface">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
+        <StackPanel x:Name="PetChrome" Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
             <Button Content="AI" Width="32" Style="{StaticResource ChromeButton}"
                     ToolTip="AI 设置" AutomationProperties.AutomationId="AiSettingsButton"
                     AutomationProperties.Name="打开 AI 设置" Click="AiSettingsButton_OnClick"/>

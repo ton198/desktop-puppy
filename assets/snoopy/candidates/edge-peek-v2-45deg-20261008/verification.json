@@ -1,0 +1,62 @@
+{
+  "peek": {
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      211,
+      172,
+      1176,
+      1131
+    ]
+  },
+  "transition": {
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      210,
+      172,
+      1175,
+      1133
+    ]
+  },
+  "blink": {
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      210,
+      171,
+      1176,
+      1133
+    ]
+  },
+  "preview": {
+    "cut_source_x": 850,
+    "head_reference_bounds_approximate": [
+      520,
+      170,
+      1175,
+      720
+    ],
+    "visible_head_width_fraction": 0.496,
+    "frame_count": 21,
+    "purpose": "illustrative; not production runtime acceptance"
+  }
+}

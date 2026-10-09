@@ -63,6 +63,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     public void NotifyAi(string text)
     {
         if (_closed || !IsVisible) return;
+        ExpandForInteraction();
         AiNotice.Text = text;
         System.Windows.Automation.AutomationProperties.SetName(AiNotice, text);
         AiNotice.Visibility = Visibility.Visible;
@@ -76,7 +77,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     {
         if (_closed) return;
         if (_visibility.ShouldShow) { if (!IsVisible) Show(); }
-        else { AiCoordinator?.InvalidateBubble(); AiNotice.Visibility = Visibility.Collapsed; if (IsVisible) Hide(); }
+        else { FinishEdgeDrag(); AiCoordinator?.InvalidateBubble(); AiNotice.Visibility = Visibility.Collapsed; if (IsVisible) Hide(); }
     }
 
     bool ITrayPetWindow.IsMinimized => WindowState == WindowState.Minimized;
@@ -100,6 +101,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
             cropped.Freeze();
             _animationImages.Add(name, cropped);
         }
+        InitializeDocking();
         _animationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _animationTimer.Tick += AnimationTimer_OnTick;
         PlayAnimation("greeting");
@@ -182,6 +184,8 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         try
         {
             _placementService.ApplyInitial(_hwnd, ActualWidth, ActualHeight);
+            // Startup DPI notifications can precede Loaded, when reconciliation cannot run yet.
+            _skipDockOnce = false;
         }
         catch (Exception exception)
         {
@@ -191,7 +195,14 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void PetWindow_OnLocationChanged(object? sender, EventArgs e) => QueuePlacementReconcile();
 
-    private void PetWindow_OnDpiChanged(object sender, WpfDpiChangedEventArgs e) => QueuePlacementReconcile();
+    private void PetWindow_OnDpiChanged(object sender, WpfDpiChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        ResetDocking();
+        _skipDockOnce = true;
+        _dockSuppressedUntilDrag = true;
+        QueuePlacementReconcile();
+    }
 
     private void MonitorDisplayProvider_OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
@@ -202,7 +213,13 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
         try
         {
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(QueuePlacementReconcile));
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                ResetDocking();
+                _skipDockOnce = true;
+                _dockSuppressedUntilDrag = true;
+                QueuePlacementReconcile();
+            }));
         }
         catch (InvalidOperationException exception)
         {
@@ -234,6 +251,8 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
                     try
                     {
                         _placementService.Reconcile(_hwnd, ActualWidth, ActualHeight);
+                        if (_edgeDock.Side != DesktopPuppy.Pet.Docking.DockSide.None) UpdateDockClip();
+                        TryDockAtEdge();
                     }
                     catch (Exception exception)
                     {
@@ -256,6 +275,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         }
 
         var now = DateTimeOffset.Now;
+        PrepareDockPointerPress();
         _interactionController.PointerPressed(
             new PointerPoint(e.GetPosition(this).X, e.GetPosition(this).Y),
             now,
@@ -270,6 +290,12 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void PetWindow_OnMouseMove(object sender, WpfMouseEventArgs e)
     {
+        if (_edgeManualDrag)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed) MoveEdgeDrag();
+            else FinishEdgeDrag();
+            return;
+        }
         if (e.OriginalSource is WpfButton)
         {
             return;
@@ -285,6 +311,12 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void PetWindow_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        if (_edgeManualDrag)
+        {
+            MoveEdgeDrag();
+            FinishEdgeDrag();
+            return;
+        }
         if (e.OriginalSource is WpfButton)
         {
             return;
@@ -318,12 +350,14 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void InteractionTimer_OnTick(object? sender, EventArgs e)
     {
+        if (_holdDockForPress && System.Windows.Input.Mouse.LeftButton == MouseButtonState.Pressed) return;
         _interactionController.Advance(DateTimeOffset.Now);
         SyncInteractionTimer();
     }
 
     private void OnInteractionEvent(PetInteractionEvent interactionEvent)
     {
+        if (interactionEvent.Type != PetInteractionEventType.DragStarted) ExpandForInteraction();
         switch (interactionEvent.Type)
         {
             case PetInteractionEventType.SingleClick:
@@ -342,8 +376,10 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
                 break;
             case PetInteractionEventType.DragStarted:
                 _dragStarted = true;
+                var manualEdgeDrag = UndockForDrag();
                 PlayAnimation("drag");
                 _interactionTimer.Stop();
+                if (manualEdgeDrag) break;
                 ReleaseMouseCapture();
                 try
                 {
@@ -358,6 +394,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
                     _interactionController.PointerReleased(interactionEvent.Position, DateTimeOffset.Now);
                     _dragStarted = false;
                     if (!_closed) PlayAnimation("landing");
+                    if (!_closed) QueuePlacementReconcile();
                 }
                 break;
             case PetInteractionEventType.DragCompleted:
@@ -377,8 +414,9 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     private void AnimationTimer_OnTick(object? sender, EventArgs e)
     {
         if (!IsVisible) return;
+        if (UpdateDockAnimation()) return;
         RenderAnimationFrame();
-        if (!_dragStarted && _currentFrame == "idle" && _animationClock.Elapsed >= _nextIdleAction)
+        if (!_dragStarted && _edgeDock.Side == DesktopPuppy.Pet.Docking.DockSide.None && _currentFrame == "idle" && _animationClock.Elapsed >= _nextIdleAction)
         {
             string[] idleActions = ["blink", "blink", "happy", "blink", "greeting"];
             PlayAnimation(idleActions[_idleIndex++ % idleActions.Length]);
@@ -417,6 +455,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void SetBubbleText(string text)
     {
+        ExpandForInteraction();
         BubbleText.Text = text;
         System.Windows.Automation.AutomationProperties.SetName(BubbleText, text);
         BubbleBorder.Visibility = Visibility.Visible;
