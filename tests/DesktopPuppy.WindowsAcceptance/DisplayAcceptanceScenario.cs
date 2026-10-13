@@ -9,8 +9,8 @@ namespace DesktopPuppy.WindowsAcceptance;
 internal sealed class DisplayAcceptanceScenario : IDisposable
 {
     private const string PetWindowAutomationId = "PetWindow";
-    private const double PetWidthDip = 260;
-    private const double PetHeightDip = 210;
+    private static double PetWidthDip => DesktopPuppy.Pet.Animation.PetVisualGeometry.VisibleBounds.Width;
+    private static double PetHeightDip => DesktopPuppy.Pet.Animation.PetVisualGeometry.VisibleBounds.Height;
 
     private readonly IDisplayAcceptanceNativeApi native;
     private readonly Dictionary<string, string> aliasesByDeviceId = new(StringComparer.Ordinal);

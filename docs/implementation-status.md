@@ -2,17 +2,38 @@
 
 > This file is the handoff point for future conversations. Read it before changing code.
 
-**Last updated:** 2026-10-08 (45-degree left/right edge docking integrated on local main; previous checkpoint `12a6f8c`)
-**Latest verified step:** Edge docking Release solution build: 0 errors / 2 existing WFO0003 warnings; separate UI-project build: 0 errors / 0 warnings. Complete deterministic suite: 269 passed; complete `Category=Ui` suite: 16 passed, 0 failed, 0 skipped (35 seconds). See `docs/verification/2026-10-08-edge-docking.md`.
-**Current phase:** Phase 4 in progress — offline statistics, monitor/DPI placement, tray, Snoopy animations, right-click AI with persistent AI settings, fullscreen suppression and edge docking are implemented. Reports, AI greetings/activities, complete settings and startup registration remain future features; real Shell/OS/multi-monitor hardware acceptance remains pending.
-**Current handoff:** The user approved the 45-degree edge sprites, accepted the running implementation, and requested local integration. Runtime, assets, tests and verification records are included in the local main integration commit. No push performed. Next: remaining Windows hardware/Shell checklist, then AI greetings/activities.
+**Last updated:** 2026-10-13.
+**AI launch follow-up:** A double-clicked instance used different saved keys and received DeepSeek HTTP 401, while the tool-launched configuration worked. Backed up the old encrypted keys and repaired the ordinary-launch saved configuration; the user's Explorer-launched repair run returned both providers HTTP 200 and displayed right-click text. All temporary repair/trace code was removed, the original published DLL hash restored, and 365 deterministic tests freshly passed. See `docs/verification/2026-10-13-ai-runtime-recovery.md`; do not treat the earlier restart-only recovery as the root-cause diagnosis.
+**Latest follow-up:** User authorized regression testing. The latest published EXE passed all 32 UI/live-refresh E2E tests in one complete run, and the full 365 unit/SQLite/HTTP tests passed freshly. This closes the post-display-fix UI gap. See `docs/verification/2026-10-13-post-fix-regression.md`. Real Windows operator acceptance and visual approval remain pending. The non-disruptive-only restriction described below is historical for this authorized regression run.
+**Current phase:** Personal local MVP implementation and integrated acceptance. Unified settings, placement, startup, expanded facts/export/clear, scene-aware AI, daily greetings/activities and daily reports are integrated. Preserve original uncommitted animation baseline. No commit, merge or push for this delivery.
+**Latest verification:** 365 unit/SQLite/HTTP contract tests passed after fixing actual AI display facts (report views and cross-midnight date). The user requests non-disruptive checks only: no product/controller launch or input injection; post-fix UI remains pending. See `docs/verification/2026-10-13-remaining-acceptance.md`. A real 15-minute stationary animation measurement passed (15:03). All five scenes passed real DeepSeek/Jev pipeline acceptance using synthetic context. The pre-display-fix published EXE passed all 32 UI / live refresh E2E tests in one complete run. Exact evidence is recorded in `docs/verification/2026-10-13-mvp-acceptance.md`; consult that record before claiming acceptance is complete.
+**Remaining acceptance:** Real login startup, fullscreen applications, lock/unlock, sleep/hibernate, multi-monitor DPI and unplugging, Explorer restart, Excel opening, and user visual approval are not yet recorded as passed. Simulated rules tests do not replace these.
+**Delivery:** `artifacts/mvp/DesktopPuppy.exe`; requires .NET 10 Windows Desktop Runtime. Usage and privacy: `docs/mvp-usage-and-privacy.md`.
+**Important integration fixes:** Global read-only module-version admission before migration; statistics disabled before startup collection; one passive foreground hook independent of collector; structured 8,000-character AI context; report-specific prompt; history-clear/shutdown serialization; placement handler attached before first visibility; async default-placement persistence.
 
+Earlier checkpoints below describe historical states.
 **AI integration — 2026-10-08:** The right-click AI worktree was fast-forward merged into local main and verified at `12a6f8c`; no push performed. Historical worktree checkpoints below describe their state at the time.
 **Current verification branch:** `main` (tray branch `codex/wpf-tray-icon` fast-forward-merged locally)
 **Current verification worktree:** `C:\Users\ton20\Documents\works\projects\desktop-puppy` (Task 7 was verified in the isolated worktree noted below)
 **Task 7 starting commit:** `7a22be97aa92fc69d1bb2128bc50e85c53c31640`
 **Latest tray integration commit on main:** `b1cfbda330c99267871baf92a42d3b484c4d5fe1` (`docs: record tray final review verification`; fast-forward target; not pushed)
 **Original implementation base (historical):** `3c2c116`
+
+## Historical animation update — 2026-10-09
+
+- [x] Added six reveal frames per side, progressively straightening and lowering the arms into the existing idle artwork.
+- [x] Interpolated image layout and scale with docking progress instead of switching layouts at the endpoint.
+- [x] Keep right-facing on the left half and left-facing on the right half of the current monitor work area; apply facing to all ordinary animations.
+- [x] Added three turn poses with exact idle endpoints, 240 ms turning and 16 DIP midpoint hysteresis. Reversals continue from the current orientation.
+- [x] Verified turn ink at both ends of every pose interval against the fixed compact viewport; fixed clipping without enlarging the window.
+- [x] Initialize facing and redraw immediately after initial placement.
+- [x] Kept immediate pointer-leave collapse from the previous update, with dragging and bubbles protected.
+- [x] Preserved ImageGen source sheet, aligned frames, prompt summary and reproduction script in `assets/snoopy/candidates/edge-reveal-v3-20261009/`.
+- [x] Independent review found no remaining important new issue after the clipping correction.
+- [ ] User acceptance of the updated appearance / turning in the running application.
+- [ ] Commit/integrate this update; no merge or push has been performed.
+
+The earlier edge-docking, compact-window and AI checkpoints below are historical. Current verification is the summary above. Existing dock-drag grab-point drift was noted during review and is not newly fixed by this update.
 
 ## Completed
 

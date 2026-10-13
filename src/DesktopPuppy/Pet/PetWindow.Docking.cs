@@ -25,6 +25,7 @@ public partial class PetWindow
     private CursorPoint _edgePressCursor;
     private PhysicalRect _edgePressWindow;
     private EdgeDragAnchor _edgeDragAnchor;
+    private TimeSpan _edgeBlinkUntil;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct CursorPoint { public int X, Y; }
@@ -39,30 +40,14 @@ public partial class PetWindow
             FinishEdgeDrag();
         };
         foreach (var side in new[] { "left", "right" })
-        foreach (var pose in new[] { "peek", "transition", "blink" })
+        foreach (var pose in new[] { "peek", "transition", "blink", "reveal-1", "reveal-2", "reveal-3", "reveal-4", "reveal-5", "reveal-6" })
         {
             var key = $"edge-{pose}-{side}";
             var bitmap = new BitmapImage(new Uri($"pack://application:,,,/Pet/Animation/Assets/{key}.png"));
             bitmap.Freeze();
             _edgeImages.Add(key, bitmap);
         }
-        // Ignore the transparent padding when deciding whether the pet is near an edge.
-        var source = (BitmapSource)_animationImages["idle"];
-        var bgra = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
-        var pixels = new byte[bgra.PixelWidth * bgra.PixelHeight * 4];
-        bgra.CopyPixels(pixels, bgra.PixelWidth * 4, 0);
-        var left = bgra.PixelWidth; var top = bgra.PixelHeight; var right = 0; var bottom = 0;
-        for (var y = 0; y < bgra.PixelHeight; y++)
-        for (var x = 0; x < bgra.PixelWidth; x++)
-        {
-            if (pixels[(y * bgra.PixelWidth + x) * 4 + 3] <= 128) continue;
-            left = Math.Min(left, x); right = Math.Max(right, x + 1);
-            top = Math.Min(top, y); bottom = Math.Max(bottom, y + 1);
-        }
-        var scale = Math.Min(PetImage.Width / bgra.PixelWidth, PetImage.Height / bgra.PixelHeight);
-        _normalInkBounds = new Rect((PetImage.Width - bgra.PixelWidth * scale) / 2 + left * scale,
-            (PetImage.Height - bgra.PixelHeight * scale) / 2 + top * scale,
-            (right - left) * scale, (bottom - top) * scale);
+        _normalInkBounds = Animation.PetVisualGeometry.GetInkBounds((BitmapSource)_animationImages["idle"], 128);
     }
 
     private void TryDockAtEdge()
@@ -75,8 +60,8 @@ public partial class PetWindow
             Math.Max(0, Math.Min(m.Bounds.Right, bounds.Right) - Math.Max(m.Bounds.Left, bounds.Left)) *
             (double)Math.Max(0, Math.Min(m.Bounds.Bottom, bounds.Bottom) - Math.Max(m.Bounds.Top, bounds.Top))).FirstOrDefault();
         if (monitor is null) return;
-        var visibleLeft = PetImage.PointToScreen(_normalInkBounds.TopLeft).X;
-        var visibleRight = PetImage.PointToScreen(_normalInkBounds.BottomRight).X;
+        var visibleLeft = PetImage.PointToScreen(new Point(_normalInkBounds.Left * _petScale, _normalInkBounds.Top * _petScale)).X;
+        var visibleRight = PetImage.PointToScreen(new Point(_normalInkBounds.Right * _petScale, _normalInkBounds.Bottom * _petScale)).X;
         var side = EdgeDockController.Detect(visibleLeft, visibleRight, monitor.WorkArea.Left,
             monitor.WorkArea.Right, _dockWindowApi.GetDpiForWindow(_hwnd) / 96d);
         if (side == DockSide.None) return;
@@ -92,6 +77,9 @@ public partial class PetWindow
             return;
         }
         UpdateDockClip();
+        _dockObserveTimer.Start();
+        WakeAnimation();
+        PlacementChanged?.Invoke();
     }
 
     private void UpdateDockClip()
@@ -123,21 +111,33 @@ public partial class PetWindow
             System.Windows.Input.Mouse.Captured == this || _interactionController.HasPendingSingleClick;
         _edgeDock.Update(_animationClock.Elapsed, DockPointerInside(), protect);
         var progress = _edgeDock.Progress;
+        if (progress > 0) SetRevealImageLayout(progress);
+        else SetNormalImageLayout();
         var origin = PetImage.TranslatePoint(new Point(0, 0), this);
         origin.X -= _edgeOffset.X;
         var shift = _edgeDock.Side == DockSide.Left ? -(origin.X + PetImage.Width * 850 / 1254) :
             ActualWidth - origin.X - PetImage.Width * (1254 - 850) / 1254;
         _edgeOffset.X = shift * progress;
-        PetChrome.Visibility = progress > 0 ? Visibility.Hidden : Visibility.Visible;
         System.Windows.Automation.AutomationProperties.SetItemStatus(this, $"dock-{_edgeDock.Side}-{_edgeDock.State}");
-        if (progress <= 0) return false;
-        var pose = progress < .8 ? "transition" :
-            _animationClock.Elapsed.TotalMilliseconds % 7000 < 120 ? "blink" : "peek";
-        var frame = $"edge-{pose}-{_edgeDock.Side.ToString().ToLowerInvariant()}";
+        if (progress <= 0) { SetNormalImageLayout(); return false; }
+        var frame = progress >= .98 ?
+            $"edge-{(_animationClock.Elapsed < _edgeBlinkUntil ? "blink" : "peek")}-{_edgeDock.Side.ToString().ToLowerInvariant()}" :
+            EdgeRevealPose.Frame(_edgeDock.Side, progress);
         _currentFrame = frame;
         PetImage.Source = _edgeImages[frame];
         System.Windows.Automation.AutomationProperties.SetName(PetImage, frame);
         return true;
+    }
+
+    private void SetRevealImageLayout(double progress)
+    {
+        var blend = EdgeRevealPose.LayoutBlend(progress);
+        var normalSize = Animation.PetVisualGeometry.ImageSize * _petScale;
+        var normalBounds = Animation.PetVisualGeometry.VisibleBounds;
+        var normalLeft = (FacesRight ? normalBounds.Right - Animation.PetVisualGeometry.ImageSize : -normalBounds.Left) * _petScale;
+        PetImage.Width = PetImage.Height = normalSize + (Height - normalSize) * blend;
+        System.Windows.Controls.Canvas.SetLeft(PetImage, normalLeft + ((Width - Height) / 2 - normalLeft) * blend);
+        System.Windows.Controls.Canvas.SetTop(PetImage, -normalBounds.Top * _petScale * (1 - blend));
     }
 
     private void ExpandForInteraction()
@@ -146,8 +146,9 @@ public partial class PetWindow
         _dockPressOffset = 0;
         _edgeDock.KeepExpanded(_animationClock.Elapsed);
         _edgeOffset.X = 0;
-        PetChrome.Visibility = Visibility.Visible;
+        SetNormalImageLayout();
         RenderAnimationFrame();
+        WakeAnimation();
     }
 
     private void ResetDocking()
@@ -155,10 +156,11 @@ public partial class PetWindow
         _holdDockForPress = false;
         _dockPressOffset = 0;
         _edgeDock.Reset();
+        _dockObserveTimer.Stop();
         _dockMonitor = null;
         _edgeOffset.X = 0;
         PetRoot.Clip = null;
-        PetChrome.Visibility = Visibility.Visible;
+        SetNormalImageLayout();
         _currentFrame = "";
         RenderAnimationFrame();
         System.Windows.Automation.AutomationProperties.SetItemStatus(this, "dock-None-Free");
@@ -173,6 +175,15 @@ public partial class PetWindow
             _dockPressOffset = _edgeOffset.X;
             GetCursorPos(out _edgePressCursor);
             _dockWindowApi.TryGetWindowRect(_hwnd, out _edgePressWindow);
+            var origin = PetImage.TranslatePoint(new Point(0, 0), this);
+            var normal = Animation.PetVisualGeometry.VisibleBounds;
+            var normalLeft = (FacesRight ? normal.Right - Animation.PetVisualGeometry.ImageSize : -normal.Left) * _petScale;
+            _edgeDragAnchor = EdgeDragAnchor.FromPose(_edgePressCursor.X, _edgePressCursor.Y, _edgePressWindow,
+                _dockWindowApi.GetDpiForWindow(_hwnd) / 96d, origin.X, origin.Y, PetImage.Width,
+                normalLeft, -normal.Top * _petScale, Animation.PetVisualGeometry.ImageSize * _petScale);
+            if (_diagnosticsEnabled)
+                System.Windows.Automation.AutomationProperties.SetHelpText(this,System.Text.Json.JsonSerializer.Serialize(new
+                { grabXDip=_edgeDragAnchor.GrabXDip,grabYDip=_edgeDragAnchor.GrabYDip,pressX=_edgePressCursor.X,pressY=_edgePressCursor.Y,poseX=origin.X,poseY=origin.Y,poseSize=PetImage.Width }));
         }
         else ExpandForInteraction();
     }
@@ -181,11 +192,6 @@ public partial class PetWindow
     {
         if (_holdDockForPress && _edgePressWindow.IsValid)
         {
-            var scale = _dockWindowApi.GetDpiForWindow(_hwnd) / 96d;
-            var shift = (int)Math.Round(_dockPressOffset * scale);
-            _edgePressWindow = new PhysicalRect(_edgePressWindow.Left + shift, _edgePressWindow.Top,
-                _edgePressWindow.Right + shift, _edgePressWindow.Bottom);
-            _edgeDragAnchor = EdgeDragAnchor.FromPress(_edgePressCursor.X, _edgePressCursor.Y, _edgePressWindow, scale);
             _edgeManualDrag = true;
         }
         _dockSuppressedUntilDrag = false;
@@ -211,5 +217,6 @@ public partial class PetWindow
         _interactionController.PointerReleased(new DesktopPuppy.Pet.Interaction.PointerPoint(0, 0), DateTimeOffset.Now);
         if (System.Windows.Input.Mouse.Captured == this) ReleaseMouseCapture();
         if (!_closed) QueuePlacementReconcile();
+        if (!_closed) PlacementChanged?.Invoke();
     }
 }

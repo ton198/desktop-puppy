@@ -9,6 +9,8 @@ public sealed class PetAnimationPlayer
     private AnimationFrame[]? _frames;
     private TimeSpan _started;
     private bool _hold;
+    public bool NeedsFrames(TimeSpan now) => _frames is not null && !_hold &&
+        (now - _started).TotalMilliseconds < _frames.Sum(f => f.DurationMs);
     public void Play(string animation, TimeSpan now)
     {
         _frames = Sequences[animation];

@@ -23,8 +23,15 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         _ownedRunDirectory = ownedRunDirectory;
     }
 
-    public static DesktopPuppyUiHarness Start(string executablePath, string? usageDatabasePath = null)
+    public static DesktopPuppyUiHarness Start(string executablePath, string? usageDatabasePath = null, string? arguments = null)
     {
+        // CenterScreen selects the cursor's monitor. Start each test on the primary display
+        // rather than inheriting a previous test's tray/secondary-display cursor location.
+        using (var displays = new DesktopPuppy.Native.Win32MonitorDisplayProvider())
+        {
+            var area = displays.GetMonitors().First(m => m.IsPrimary).WorkArea;
+            SetCursorPos(area.Left + area.Width / 2, area.Top + area.Height / 2);
+        }
         string? ownedRunDirectory = null;
         if (usageDatabasePath is null)
         {
@@ -38,6 +45,8 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             WorkingDirectory = Path.GetDirectoryName(executablePath),
             UseShellExecute = false
         };
+        if (arguments is not null) startInfo.Arguments = arguments;
+        startInfo.Environment["DESKTOP_PUPPY_TEST_DIAGNOSTICS"] = "1";
         if (usageDatabasePath is not null)
         {
             startInfo.Environment["DESKTOP_PUPPY_USAGE_DB_PATH"] = usageDatabasePath;
@@ -54,6 +63,7 @@ public sealed class DesktopPuppyUiHarness : IDisposable
 
     public AutomationElement WaitForPetWindow(TimeSpan timeout)
     {
+        _process.WaitForInputIdle((int)timeout.TotalMilliseconds);
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
@@ -63,7 +73,10 @@ public sealed class DesktopPuppyUiHarness : IDisposable
                 try
                 {
                     var element = AutomationElement.FromHandle(_windowHandle);
-                    if (element is not null)
+                    if (element is not null && !element.Current.IsOffscreen &&
+                        element.Current.BoundingRectangle.Width > 0 &&
+                        element.FindFirst(TreeScope.Descendants,
+                            new PropertyCondition(AutomationElement.AutomationIdProperty, "PetAnimation")) is not null)
                     {
                         return element;
                     }
@@ -98,8 +111,12 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             Thread.Sleep(50);
         }
 
+        var windows = AutomationElement.RootElement.FindAll(TreeScope.Children,
+            new PropertyCondition(AutomationElement.ProcessIdProperty, _process.Id));
+        var details = string.Join(", ", windows.Cast<AutomationElement>()
+            .Select(w => $"{w.Current.Name} ({w.Current.AutomationId})"));
         throw new TimeoutException(
-            $"Top-level UI Automation window '{automationId}' was not found for process {_process.Id}.");
+            $"Top-level UI Automation window '{automationId}' was not found for process {_process.Id}. Windows: {details}; running={IsProcessRunning}.");
     }
     public AutomationElement FindByAutomationId(AutomationElement root, string automationId)
     {
@@ -339,11 +356,96 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         CountVisibleTopLevelWindows(_process.Id, automationId);
 
     public bool IsProcessRunning => !_process.HasExited;
+    public bool HasVisiblePet => FindVisibleWindow(_process.Id) != IntPtr.Zero;
 
     public void Invoke(AutomationElement element)
     {
         var pattern = (InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern);
         pattern.Invoke();
+    }
+
+    public AutomationElement WaitForSpeechWindow() => WaitForTopLevelWindow("PetSpeechWindow", TimeSpan.FromSeconds(5));
+
+    public void RevealPetAndWaitForIdle(AutomationElement pet, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        var api = new DesktopPuppy.Native.Win32WindowApi();
+        var scale = api.GetDpiForWindow(_windowHandle) / 96d;
+        while (DateTime.UtcNow < deadline)
+        {
+            var status = pet.Current.ItemStatus;
+            if (status.StartsWith("dock-Left-") || status.StartsWith("dock-Right-"))
+            {
+                var rect = GetWindowRect();
+                var x = status.StartsWith("dock-Right-") ? rect.Right - (int)(18 * scale) : rect.Left + (int)(18 * scale);
+                SetCursorPos(x, rect.Top + (int)((rect.Bottom - rect.Top) * .48));
+            }
+            if (FindByAutomationId(pet, "PetAnimation").Current.Name == "idle") return;
+            Thread.Sleep(20);
+        }
+        throw new TimeoutException($"Pet did not reveal its idle pose; status={pet.Current.ItemStatus}.");
+    }
+
+    public void InvokeTrayMenu(string name)
+    {
+        AutomationElement? icon = null;
+        var iconDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+        var overflowOpened = false;
+        while (DateTime.UtcNow < iconDeadline && icon is null)
+        {
+            icon = FindTrayIcon();
+            if (icon is not null) break;
+            var overflow = AutomationElement.RootElement.FindFirst(TreeScope.Descendants,
+                new OrCondition(
+                    new PropertyCondition(AutomationElement.AutomationIdProperty, "NotifyIconOverflowButton"),
+                    new PropertyCondition(AutomationElement.NameProperty, "显示隐藏的图标"),
+                    new PropertyCondition(AutomationElement.NameProperty, "Show hidden icons")));
+            var openPanel = AutomationElement.RootElement.FindFirst(TreeScope.Children,
+                new OrCondition(new PropertyCondition(AutomationElement.ClassNameProperty, "TopLevelWindowForOverflowXamlIsland"),
+                    new PropertyCondition(AutomationElement.ClassNameProperty, "NotifyIconOverflowWindow")));
+            if (overflow is not null && !overflowOpened && (openPanel is null || openPanel.Current.IsOffscreen))
+            {
+                ClickElement(overflow, MouseButton.Left);
+                overflowOpened = true;
+            }
+            Thread.Sleep(50);
+        }
+        if (icon is null)
+        {
+            var shellPanels = AutomationElement.RootElement.FindAll(TreeScope.Children, Condition.TrueCondition)
+                .Cast<AutomationElement>().Where(e => e.Current.ClassName.Contains("Tray", StringComparison.OrdinalIgnoreCase) ||
+                    e.Current.ClassName.Contains("Overflow", StringComparison.OrdinalIgnoreCase))
+                .Select(e => $"{e.Current.ClassName}:offscreen={e.Current.IsOffscreen}:hwnd={e.Current.NativeWindowHandle}");
+            throw new InvalidOperationException($"Desktop Puppy tray icon was not found; process running={IsProcessRunning}; shell={string.Join(";",shellPanels)}.");
+        }
+        ClickElement(icon, MouseButton.Right);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        while (DateTime.UtcNow < deadline)
+        {
+            var item = AutomationElement.RootElement.FindFirst(TreeScope.Descendants,
+                new AndCondition(new PropertyCondition(AutomationElement.NameProperty, name),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem)));
+            if (item is not null && !item.Current.IsOffscreen)
+            {
+                if (item.TryGetCurrentPattern(InvokePattern.Pattern, out var pattern)) ((InvokePattern)pattern).Invoke();
+                else ClickElement(item, MouseButton.Left);
+                return;
+            }
+            Thread.Sleep(50);
+        }
+        throw new TimeoutException($"Tray menu item '{name}' was not found.");
+    }
+
+    private AutomationElement? FindTrayIcon() => AutomationElement.RootElement.FindAll(TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.NameProperty, $"Desktop Puppy ({_process.Id})"))
+        .Cast<AutomationElement>().FirstOrDefault(e => e.Current.ControlType == ControlType.Button && !e.Current.IsOffscreen);
+
+    private static void ClickElement(AutomationElement element, MouseButton button)
+    {
+        var rect = element.Current.BoundingRectangle;
+        SetCursorPos((int)(rect.Left + rect.Width / 2), (int)(rect.Top + rect.Height / 2));
+        SendMouseButton(button, true);
+        SendMouseButton(button, false);
     }
 
     public void RightClickCenter()
@@ -384,10 +486,15 @@ public sealed class DesktopPuppyUiHarness : IDisposable
         try
         {
             WaitForWindowMouseCapture(TimeSpan.FromSeconds(1));
-            SetCursorPos(start.X + 20, start.Y);
-            Thread.Sleep(100);
-            SetCursorPos(end.X, end.Y);
-            Thread.Sleep(100);
+            // Native SC_MOVE starts on a later mouse message than WPF's DragStarted.
+            // A real gesture supplies a stream of messages; capture/GUI flags alone
+            // are not a reliable readiness signal for the nested move loop.
+            for (var step = 1; step <= 20; step++)
+            {
+                SetCursorPos(start.X + (end.X - start.X) * step / 20,
+                    start.Y + (end.Y - start.Y) * step / 20);
+                Thread.Sleep(30);
+            }
         }
         finally
         {
@@ -524,6 +631,8 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             }
         }
 
+        // Wait for queued WPF Loaded/DPI placement before choosing an input coordinate.
+        Thread.Sleep(100);
     }
 
     private static void SendMouseButton(MouseButton button, bool pressed)

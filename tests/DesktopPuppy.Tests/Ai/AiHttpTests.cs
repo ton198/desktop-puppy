@@ -10,6 +10,15 @@ namespace DesktopPuppy.Tests.Ai;
 public sealed class AiHttpTests
 {
     [Fact]
+    public async Task Report_prompt_has_only_report_length_and_sufficient_response_budget()
+    {
+        var handler=new Handler(JsonSerializer.Serialize(new { choices=new[]{new {message=new {content=JsonSerializer.Serialize(new {candidates=AiPipelineTests.Candidates.Select(c=>new {text=c.Text,style=c.Style})})}}}}));
+        await new DeepSeekContentProvider(new HttpClient(handler),()=>"key").GenerateAsync(new("","","day",[],AiSceneKind.DailyReport),[],1,CancellationToken.None);
+        using var json=JsonDocument.Parse(handler.Body);var system=json.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("200至500",system);Assert.DoesNotContain("每条10至80",system);Assert.Equal(6000,json.RootElement.GetProperty("max_tokens").GetInt32());
+        Assert.Contains("日报正文",system);Assert.Contains("220至350",system);
+    }
+    [Fact]
     public async Task DeepSeek_sends_json_mode_six_candidates_and_auth_only_in_header()
     {
         var key = Guid.NewGuid().ToString("N");

@@ -15,7 +15,7 @@ public sealed class EdgeDockControllerTests
         => Assert.Equal(expected, EdgeDockController.Detect(left, right, workLeft, workRight, scale));
 
     [Fact]
-    public void Docking_and_hover_reveal_take_250ms()
+    public void Docking_takes_250ms_and_hover_reveal_takes_350ms()
     {
         var c = new EdgeDockController();
         c.Dock(DockSide.Left, TimeSpan.Zero);
@@ -23,26 +23,30 @@ public sealed class EdgeDockControllerTests
         Assert.Equal(DockState.Collapsed, c.State);
         Assert.Equal(1, c.Progress);
         c.Update(TimeSpan.FromMilliseconds(300), true, false);
-        c.Update(TimeSpan.FromMilliseconds(550), true, false);
+        c.Update(TimeSpan.FromMilliseconds(650), true, false);
         Assert.Equal(DockState.Expanded, c.State);
         Assert.Equal(0, c.Progress);
     }
 
-    [Fact]
-    public void Pointer_leave_waits_800ms_and_bubble_keeps_pet_expanded()
+    [Theory]
+    [InlineData(DockSide.Left)]
+    [InlineData(DockSide.Right)]
+    public void Pointer_leave_starts_collapsing_immediately_and_bubble_keeps_pet_expanded(DockSide side)
     {
-        var c = Expanded();
+        var c = new EdgeDockController();
+        c.Dock(side, TimeSpan.Zero);
+        c.KeepExpanded(TimeSpan.Zero);
         c.Update(TimeSpan.FromMilliseconds(300), false, false);
-        c.Update(TimeSpan.FromMilliseconds(1099), false, false);
-        Assert.Equal(DockState.Expanded, c.State);
-        c.Update(TimeSpan.FromMilliseconds(1100), false, false);
         Assert.Equal(DockState.Collapsing, c.State);
-        c.Update(TimeSpan.FromMilliseconds(1200), false, true);
-        c.Update(TimeSpan.FromMilliseconds(1450), false, true);
-        Assert.Equal(DockState.Expanded, c.State);
-        c.Update(TimeSpan.FromMilliseconds(1600), false, false);
-        c.Update(TimeSpan.FromMilliseconds(2399), false, false);
         Assert.Equal(0, c.Progress);
+        c.Update(TimeSpan.FromMilliseconds(550), false, false);
+        Assert.Equal(DockState.Collapsed, c.State);
+        c.Update(TimeSpan.FromMilliseconds(600), false, true);
+        c.Update(TimeSpan.FromMilliseconds(950), false, true);
+        Assert.Equal(DockState.Expanded, c.State);
+        Assert.Equal(0, c.Progress);
+        c.Update(TimeSpan.FromMilliseconds(1000), false, false);
+        Assert.Equal(DockState.Collapsing, c.State);
     }
 
     [Fact]
@@ -70,14 +74,6 @@ public sealed class EdgeDockControllerTests
         c.KeepExpanded(TimeSpan.FromMilliseconds(100));
         Assert.Equal(0, c.Progress);
         Assert.Equal(DockState.Expanded, c.State);
-    }
-
-    private static EdgeDockController Expanded()
-    {
-        var c = new EdgeDockController();
-        c.Dock(DockSide.Left, TimeSpan.Zero);
-        c.KeepExpanded(TimeSpan.Zero);
-        return c;
     }
 
     [Fact]

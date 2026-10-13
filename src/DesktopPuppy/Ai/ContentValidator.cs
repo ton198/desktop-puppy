@@ -8,12 +8,13 @@ public sealed class ContentValidator
 {
     public static readonly string[] Styles = ["tease", "deadpan", "absurd", "mock-serious", "wordplay", "dramatic"];
     private static readonly string[] Banned = ["作为AI", "作为 AI", "人工智能", "语言模型", "您好", "很高兴为您", "有什么可以帮", "根据您提供", "希望这能帮助"];
-    public bool IsValid(ContentCandidate candidate, IReadOnlyList<ContentCandidate> pool, IReadOnlyList<DisplayedContent> recent)
+    public bool IsValid(ContentCandidate candidate, IReadOnlyList<ContentCandidate> pool, IReadOnlyList<DisplayedContent> recent, AiSceneProfile? profile = null)
     {
         var text = candidate.Text;
         if (string.IsNullOrWhiteSpace(text) || text != text.Trim() || !Styles.Contains(candidate.Style)) return false;
         var count = StringInfo.ParseCombiningCharacters(text).Length;
-        if (count is < 10 or > 80 || text.Any(char.IsControl) || text.IndexOfAny(['\n', '\r', '*', '`', '#', '[', ']', '<', '>', '_']) >= 0) return false;
+        profile ??= AiSceneProfile.For(AiSceneKind.RightClick);
+        if (count < profile.MinimumLength || count > profile.MaximumLength || text.Any(char.IsControl) || text.IndexOfAny(['\n', '\r', '*', '`', '#', '[', ']', '<', '>', '_']) >= 0) return false;
         if (Banned.Any(b => text.Contains(b, StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(text, @"[!！?？。.,，…]{3,}")) return false;
         // Emoji/symbol clusters: conservative limit of one; variation selectors don't count twice.
         if (text.EnumerateRunes().Count(r => Rune.GetUnicodeCategory(r) == UnicodeCategory.OtherSymbol) > 1) return false;

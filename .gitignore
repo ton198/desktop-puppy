@@ -33,3 +33,5 @@ Thumbs.db
 artifacts/
 logs/
 reports/local/
+.dotnet-home/
+.codex-verify-*/

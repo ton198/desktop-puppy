@@ -154,7 +154,19 @@
             </Border>
         </Grid>
 
-        <Grid Grid.Row="2" Margin="20,16,20,20">
+        <DockPanel Grid.Row="2" Margin="20,16,20,20">
+            <Expander DockPanel.Dock="Top" Header="更多统计" Margin="0,0,0,12" AutomationProperties.AutomationId="StatisticsFactsExpander">
+                <StackPanel Margin="12,8">
+                    <TextBlock Text="{Binding Facts.ApplicationSwitchCount, StringFormat=应用切换：{0} 次}" />
+                    <TextBlock Text="{Binding Facts.LongestContinuousDuration, Converter={StaticResource ElapsedDurationConverter}, StringFormat=最长连续使用：{0}}" />
+                    <TextBlock Text="{Binding Facts.DeepNightDuration, Converter={StaticResource ElapsedDurationConverter}, StringFormat=深夜使用：{0}}" />
+                    <TextBlock Text="{Binding CategorySummary}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding InteractionSummary}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding AiSummary}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding HourlySummary}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </StackPanel>
+            </Expander>
+        <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="5*" />
                 <ColumnDefinition Width="16" />
@@ -249,5 +261,6 @@
                 </DockPanel>
             </Border>
         </Grid>
+        </DockPanel>
     </Grid>
 </Window>

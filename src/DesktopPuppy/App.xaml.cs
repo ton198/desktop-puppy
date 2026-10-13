@@ -38,19 +38,20 @@ public partial class App : WpfApplication
     private ContextForegroundWatcher? _contextWatcher;
     private AiSqliteStore? _aiStore;
     private ApiKeyService? _apiKeys;
-    private AiSettingsWindow? _aiSettingsWindow;
+    private DesktopPuppy.Settings.SettingsWindow? _aiSettingsWindow;
     private HttpClient? _aiHttp;
     private DispatcherTimer? _fullscreenTimer;
     private IFullscreenDetector? _fullscreenDetector;
     private bool _lastFullscreen;
     private Timer? _aiRetentionTimer;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        _singleInstanceGuard = new SingleInstanceGuard();
+        var scope = InstanceScope.ForDatabase(Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH"));
+        _singleInstanceGuard = new SingleInstanceGuard($"Local\\{scope}.SingleInstance", $"Local\\{scope}.Activate");
         if (!_singleInstanceGuard.TryAcquire(ActivateExistingInstance))
         {
             Shutdown();
@@ -58,34 +59,62 @@ public partial class App : WpfApplication
         }
 
         ShutdownMode = ShutdownMode.OnMainWindowClose;
-        StartUsageTracking();
+        try
+        {
+            await Task.Run(() => DesktopPuppy.Data.DatabaseVersionAdmission.AssertCompatible(DatabasePath));
+            _settings = new DesktopPuppy.Settings.SettingsService(DatabasePath);
+            await _settings.LoadAsync();
+        }
+        catch { _featureInitializationFailed = true; }
+        if (!_featureInitializationFailed)
+        {
+            try { await Task.Run(StartUsageTracking); }
+            catch { _featureInitializationFailed = true; }
+        }
 
         InitializePetWindowPlacement();
         _petWindow = new PetWindow(_petWindowPlacementService, _monitorDisplayProvider);
-        _petWindow.StatisticsRequested += PetWindow_OnStatisticsRequested;
-        _petWindow.AiSettingsRequested += PetWindow_OnAiSettingsRequested;
         MainWindow = _petWindow;
-        InitializeAi();
+        // Visibility suppression must precede fullscreen reconciliation, which can show
+        // the window. Placement restoration is attached before its first Loaded event.
+        _petWindow.SetStartupWaiting(true);
+        if (!_featureInitializationFailed) InitializeAi();
         InitializeFullscreen();
-        _petWindow.ShowFromUser();
+        _petWindow.BeforeExit = StopFeaturesAsync;
+        _petWindow.RequestBlock = () => _featureInitializationFailed;
 
         _trayApplicationActions = new TrayApplicationActions(_petWindow, OpenOrActivateStatisticsWindow, OpenOrActivateAiSettingsWindow);
-        _trayCommandService = new TrayCommandService(new WinFormsTrayIconHost(), _trayApplicationActions);
+        _trayHost = new WinFormsTrayIconHost { Tooltip = Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH") is null ? "Desktop Puppy" : $"Desktop Puppy ({Environment.ProcessId})" };
+        _trayCommandService = new TrayCommandService(_trayHost, _trayApplicationActions);
         _trayCommandService.Start();
+        try
+        {
+            if (_featureInitializationFailed) throw new InvalidOperationException();
+            await InitializeFeaturesAsync(e.Args.Contains("--startup"));
+        }
+        catch
+        {
+            _featureInitializationFailed = true;
+            _featureTimer?.Stop(); _aiRetentionTimer?.Dispose(); _usageRetentionCheckTimer?.Dispose();
+            _featureCancellation.Cancel();
+            if (_petWindow.AiCoordinator is not null) await _petWindow.AiCoordinator.CancelAndDrainAsync();
+            await Task.Run(() => _usageCollector?.Stop());
+            _petWindow.SetStartupWaiting(false); _petWindow.ShowFromUser();
+            _petWindow.NotifyAi("数据库或功能初始化失败，已停止新任务写入；原数据保留。请检查设置或重启程序。");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _fullscreenTimer?.Stop();
+        _featureTimer?.Stop();
+        _startupDelay?.Dispose();
+        _featureCancellation.Cancel();
         _aiRetentionTimer?.Dispose();
         _petWindow?.AiCoordinator?.Dispose();
         _aiHttp?.Dispose();
         _aiSettingsWindow?.Close();
-        if (_petWindow is not null)
-        {
-            _petWindow.StatisticsRequested -= PetWindow_OnStatisticsRequested;
-            _petWindow.AiSettingsRequested -= PetWindow_OnAiSettingsRequested;
-        }
+
 
         try
         {
@@ -232,7 +261,7 @@ public partial class App : WpfApplication
                 watcher,
                 _usageStore);
             _usageCollector = collector;
-            collector.Start();
+            if (_settings?.Current.Statistics.Enabled == true) collector.Start();
             _usageAdvanceTimer = new Timer(
                 static state =>
                 {
@@ -255,7 +284,13 @@ public partial class App : WpfApplication
                 collector.RefreshForegroundWindow,
                 () => TryCheckUsageRetention(retentionCoordinator, clock));
             sessionPowerEventSource = new SystemEventsSessionPowerEventSource(clock);
-            sessionPowerEventSource.Start(router.OnEvent);
+            sessionPowerEventSource.Start((kind, at) =>
+            {
+                RecordBoundary(kind, at);
+                router.OnEvent(kind, at);
+                if (kind is SessionPowerEvent.Unlocked or SessionPowerEvent.Resume)
+                    Dispatcher.BeginInvoke(() => QueueFeatureCheck());
+            });
             _sessionPowerEventSource = sessionPowerEventSource;
             _usageStatisticsQuery = new UsageStatisticsQueryService(
                 _usageStore,
@@ -305,9 +340,7 @@ public partial class App : WpfApplication
         }
     }
 
-    private void PetWindow_OnStatisticsRequested(object? sender, EventArgs e) => OpenOrActivateStatisticsWindow();
 
-    private void PetWindow_OnAiSettingsRequested(object? sender, EventArgs e) => OpenOrActivateAiSettingsWindow();
 
     private void InitializeAi()
     {
@@ -320,6 +353,7 @@ public partial class App : WpfApplication
             _apiKeys = new ApiKeyService(_aiStore, new DpapiApiKeyProtector());
             _aiHttp = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
             var pipeline = new AiPipeline(new DeepSeekContentProvider(_aiHttp, () => _apiKeys.Get(AiProvider.DeepSeek)), new JevDecisionProvider(_aiHttp, () => _apiKeys.Get(AiProvider.Jev)), new AiDelay());
+            _aiPipeline = pipeline;
             var monotonic = Stopwatch.StartNew();
             _petWindow!.AiCoordinator = new RightClickAiCoordinator(_aiStore, _apiKeys, pipeline, _petWindow, () => _contextWatcher?.LastExternal, () => DateTimeOffset.UtcNow, () => monotonic.Elapsed);
             var retention = new UsageRetentionCoordinator(_aiStore.PruneBefore, TimeZoneInfo.Local);
@@ -344,7 +378,7 @@ public partial class App : WpfApplication
         _fullscreenDetector = new Win32FullscreenDetector(_monitorDisplayProvider);
         _petWindow!.FullscreenNow = CheckFullscreen;
         _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-        _fullscreenTimer.Tick += (_, _) => _petWindow.SetFullscreen(CheckFullscreen());
+        _fullscreenTimer.Tick += (_, _) => _petWindow.SetFullscreen((_settings?.Current.Interaction.SuppressOnFullscreen ?? true) && CheckFullscreen());
         _petWindow.SetFullscreen(CheckFullscreen());
         _fullscreenTimer.Start();
     }
@@ -357,17 +391,7 @@ public partial class App : WpfApplication
 
     private void OpenOrActivateAiSettingsWindow()
     {
-        if (_aiStore is null || _apiKeys is null) { _petWindow?.NotifyAi("AI 存储暂时不可用。"); return; }
-        if (_aiSettingsWindow is not null)
-        {
-            if (_aiSettingsWindow.WindowState == WindowState.Minimized) _aiSettingsWindow.WindowState = WindowState.Normal;
-            _aiSettingsWindow.Activate();
-            return;
-        }
-        var window = new AiSettingsWindow(_aiStore, _apiKeys);
-        window.Closed += (_, _) => _aiSettingsWindow = null;
-        _aiSettingsWindow = window;
-        window.Show();
+        OpenSettings(true);
     }
 
     private void OpenOrActivateStatisticsWindow()
@@ -386,7 +410,8 @@ public partial class App : WpfApplication
         var viewModel = new UsageStatisticsViewModel(
             _usageStatisticsQuery ?? UnavailableUsageStatisticsQuery.Instance,
             TimeZoneInfo.Local,
-            () => DateTimeOffset.UtcNow);
+            () => DateTimeOffset.UtcNow,
+            date => BuildFactsAsync(date, TimeOnly.MaxValue));
         var window = new UsageStatisticsWindow(viewModel);
         window.Closed += (_, _) =>
         {

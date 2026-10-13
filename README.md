@@ -2,11 +2,17 @@
 
 一个面向个人使用的 Windows WPF 桌面宠物项目。
 
-当前状态（2026-10-08）：Phase 4 进行中。已完成桌宠交互、Snoopy 动画接入、SQLite 离线使用统计与统计窗口、15 日保留策略、Windows 锁屏/挂起/恢复事件接入、显示器/DPI 放置和托盘。最近验证：260 个单元测试、14 个桌面 UI 测试通过。
+安装包：`artifacts/installer/DesktopPuppy-0.1.0-win-x64-Setup.exe`，支持 Windows 10 22H2 及以上 x64，内置 .NET 10 运行时，无需单独安装运行时。默认安装到当前用户的 `%LOCALAPPDATA%\Programs\DesktopPuppy`，提供开始菜单入口、可选桌面快捷方式和卸载入口；卸载保留 `%LOCALAPPDATA%\DesktopPuppy` 下的用户数据。安装包未签名。
+
+重新打包：安装 [Inno Setup](https://jrsoftware.org/isdl.php)，执行 `pwsh -File scripts/build-installer.ps1`；可通过 `-Version 0.1.1 -IsccPath "编译器路径\ISCC.exe"` 指定版本和编译器。产物和 SHA-256 校验文件保存在 `artifacts/installer/`。
+
+最新回归（2026-10-13）：统计修正后的最新发布版已完成完整 UI/E2E，32 项全部通过；完整单元/数据库/HTTP 套件重新运行，365 项全部通过。详见 `docs/verification/2026-10-13-post-fix-regression.md`。下文关于修正后 UI 尚未重跑的描述为历史状态，真实系统人工验收仍待完成。
+
+当前状态（2026-10-13）：个人本地 MVP 的设置、位置记忆、启动协调、扩展统计、数据管理、问候与随机活动、日报已实现。完整单元/数据库测试 365 项通过，15 分钟空闲刷新测量通过，五个 AI 场景真实 Provider 联调通过；统计修正前的交付版 UI/E2E 共 32 项通过；修正后的 UI 暂未重跑，按用户要求不影响桌面。真实登录、全屏、锁屏、睡眠、多屏/拔屏及 Explorer 重启仍需人工验收。本轮未提交、合并或推送。
 
 本轮更新（2026-10-08）：已实现右键 AI 台词链路、AI 设置入口、DPAPI 加密 Key、候选校验/重试、单气泡 15 秒展示期限及全屏抑制。真实 DeepSeek/Jev 联调和用户右键手动测试通过。DeepSeek 显式关闭思考，三次独立测试点击到气泡为 1.65 / 1.91 / 2.23 秒，中位数 1.91 秒；不保证每次两秒内。真实全屏及其他硬件/系统验收仍待完成。本轮合并回本地 main，不推送远端。
 
-使用方式：运行 `src/DesktopPuppy/bin/Release/net10.0-windows/DesktopPuppy.exe`，通过桌宠上的 **AI** 按钮或托盘 **AI 设置**，分别保存 DeepSeek 和 Jev Key，再右键桌宠。已保存的用户配置可继续使用。最多一个请求在途；占位气泡 15 秒后移除，迟到结果只记录。左键和受击继续使用本地台词。API 最终失败不使用本地备用台词。
+使用方式：运行本次交付的 `artifacts/mvp/DesktopPuppy.exe`（需要 .NET 10 Windows Desktop Runtime），或自己构建后的 `src/DesktopPuppy/bin/Release/net10.0-windows/DesktopPuppy.exe`，通过托盘 **AI 设置**，分别保存 DeepSeek 和 Jev Key，再右键桌宠。已保存的用户配置可继续使用。最多一个请求在途；占位气泡 15 秒后移除，迟到结果只记录。左键和受击继续使用本地台词。API 最终失败不使用本地备用台词。
 
 ## 已确定方向
 
@@ -33,6 +39,6 @@
 
 ## 当前阶段
 
-已接入左右靠边探头：拖到工作区左右边缘24 DIP以内，松手后收起为约45度倾斜的半头；悬停250毫秒展开为完整桌宠，移开800毫秒后收起。气泡显示时保持展开，半头可以直接拖走。最新验证：269个单元测试、16个桌面UI测试通过。真实双屏/DPI和任务栏布局仍需手动验收。
+已接入左右靠边探头：拖到工作区左右边缘 24 DIP 以内，松手后收起为约 45 度倾斜的半头；悬停后用 350 毫秒逐帧回正并展开，鼠标移开立即开始 250 毫秒收起。气泡显示时保持展开，半头可以直接拖走。桌宠在屏幕左半边朝右、右半边朝左，跨过所在显示器工作区中线的 16 DIP 缓冲区后播放 240 毫秒转身动画。主窗口只显示桌宠，AI 设置、统计和退出从托盘菜单访问。真实双屏/DPI和任务栏布局仍需手动验收。
 
-下一步：检查程序内动画和真实全屏行为，完成托盘、锁屏/睡眠、多显示器/DPI 与双实例验收；后续扩展问候/随机活动 AI、日报、完整设置持久化与开机启动。完整记录见 `docs/implementation-status.md`。
+使用与隐私见 [MVP 使用说明](docs/mvp-usage-and-privacy.md)。实施、自动化与待执行的人工验收见 [本次验收记录](docs/verification/2026-10-13-mvp-acceptance.md)。完整项目历史见 `docs/implementation-status.md`。

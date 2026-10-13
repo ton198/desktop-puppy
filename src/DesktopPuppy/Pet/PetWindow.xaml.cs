@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -33,7 +33,19 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         "右键是秘密通道，试试看。"
     ];
 
+    private readonly PetSpeechWindow _speech = new();
+    private Border BubbleBorder => _speech.BubbleBorder;
+    private TextBlock BubbleText => _speech.BubbleText;
+    private TextBlock AiNotice => _speech.AiNotice;
     private readonly DispatcherTimer _animationTimer;
+    private readonly DispatcherTimer _idleTimer = new() { Interval = TimeSpan.FromSeconds(7) };
+    private readonly DispatcherTimer _dockObserveTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private double _petScale = 1;
+    public bool Paused { get; private set; }
+    public Func<bool>? RequestBlock { get; set; }
+    public bool HasBubble => BubbleBorder.Visibility == Visibility.Visible || AiNotice.Visibility == Visibility.Visible;
+    public event Action<PetInteractionEventType>? InteractionTriggered;
+    public event Action? PlacementChanged;
     private readonly PetAnimationPlayer _animationPlayer = new();
     private readonly Stopwatch _animationClock = Stopwatch.StartNew();
     private readonly Dictionary<string, ImageSource> _animationImages = new();
@@ -55,11 +67,11 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     private TimeSpan _noticeDeadline;
     public RightClickAiCoordinator? AiCoordinator { get; set; }
     public Func<bool>? FullscreenNow { get; set; }
-    public event EventHandler? AiSettingsRequested;
-    public bool CanShowAi => !_closed && IsVisible && _visibility.ShouldShow && !(FullscreenNow?.Invoke() ?? false);
+    public bool CanShowAi => !_closed && !Paused && !(RequestBlock?.Invoke() ?? false) && IsVisible && _visibility.ShouldShow && !(FullscreenNow?.Invoke() ?? false);
+    public bool UserHidden => _visibility.UserHidden;
     void IRightClickAiView.ShowPlaceholder() => SetBubbleText("想一句调皮的话……");
     void IRightClickAiView.ShowAiText(string text) => SetBubbleText(text);
-    void IRightClickAiView.RemovePlaceholder() => BubbleBorder.Visibility = Visibility.Collapsed;
+    void IRightClickAiView.RemovePlaceholder() { BubbleBorder.Visibility = Visibility.Collapsed; RefreshSpeech(); }
     public void NotifyAi(string text)
     {
         if (_closed || !IsVisible) return;
@@ -68,6 +80,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         System.Windows.Automation.AutomationProperties.SetName(AiNotice, text);
         AiNotice.Visibility = Visibility.Visible;
         _noticeDeadline = _animationClock.Elapsed + TimeSpan.FromSeconds(8);
+        RefreshSpeech();
     }
     public void ShowFromUser() { _visibility.SetUserHidden(false); ApplyVisibility(); }
     void ITrayPetWindow.Show() => ShowFromUser();
@@ -86,30 +99,51 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     void ITrayPetWindow.Activate() { if (_visibility.ShouldShow) _ = Activate(); }
 
-    public event EventHandler? StatisticsRequested;
 
     public PetWindow(
         PetWindowPlacementService? placementService = null,
         IMonitorDisplayProvider? monitorDisplayProvider = null)
     {
         InitializeComponent();
-        foreach (var name in PetAnimationPlayer.Sequences.Values.SelectMany(frames => frames).Select(frame => frame.Name).Append("idle").Distinct())
-        {
-            var bitmap = new BitmapImage(new Uri($"pack://application:,,,/Pet/Animation/Assets/{name}.png"));
-            // All frames share one crop, preserving alignment between poses.
-            var cropped = new CroppedBitmap(bitmap, new Int32Rect(250, 80, 800, 1120));
-            cropped.Freeze();
-            _animationImages.Add(name, cropped);
-        }
+        foreach (var frame in PetVisualGeometry.NormalFrames) _animationImages.Add(frame.Key, frame.Value);
+        Width = PetVisualGeometry.VisibleBounds.Width;
+        Height = PetVisualGeometry.VisibleBounds.Height;
+        SetNormalImageLayout();
+        _speech.BubbleClosed += (_, _) => CloseBubble();
+        _speech.SizeChanged += (_, _) => PositionSpeech();
+        _speech.DpiChanged += (_, _) => Dispatcher.BeginInvoke(new Action(PositionSpeech));
+        IsVisibleChanged += (_, _) => { if (!IsVisible) HideSpeech(); else WakeAnimation(); };
         InitializeDocking();
+        InitializeFacing();
         _animationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _animationTimer.Tick += AnimationTimer_OnTick;
+        _idleTimer.Tick += (_, _) =>
+        {
+            _idleTimer.Stop();
+            if (_closed || !IsVisible || Paused) return;
+            if (_edgeDock.Side != DesktopPuppy.Pet.Docking.DockSide.None) { _edgeBlinkUntil = _animationClock.Elapsed + TimeSpan.FromMilliseconds(120); WakeAnimation(); }
+            else if (!_dragStarted && !HasBubble) { string[] actions = ["blink", "blink", "happy", "blink"]; PlayAnimation(actions[_idleIndex++ % actions.Length]); }
+            else ScheduleIdle();
+        };
+        _dockObserveTimer.Tick += (_, _) =>
+        {
+            if (_closed || !IsVisible || _edgeDock.Side == DesktopPuppy.Pet.Docking.DockSide.None || _animationTimer.IsEnabled) return;
+            var inside = DockPointerInside();
+            var protect = HasBubble || _holdDockForPress || (_interactionController?.HasPendingSingleClick ?? false);
+            if ((inside || protect) != (_edgeDock.Progress <= 0)) WakeAnimation();
+        };
+        MouseEnter += (_, _) => WakeAnimation();
+        MouseLeave += (_, _) => WakeAnimation();
         PlayAnimation("greeting");
         _animationTimer.Start();
         _aiTimer.Tick += (_, _) =>
         {
             AiCoordinator?.Advance();
-            if (_animationClock.Elapsed >= _noticeDeadline) AiNotice.Visibility = Visibility.Collapsed;
+            if (AiNotice.Visibility == Visibility.Visible && _animationClock.Elapsed >= _noticeDeadline)
+            {
+                AiNotice.Visibility = Visibility.Collapsed;
+                RefreshSpeech();
+            }
         };
         _aiTimer.Start();
         _placementService = placementService;
@@ -139,11 +173,26 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (!_exitReady && BeforeExit is not null)
+        {
+            e.Cancel = true;
+            if (!_exitStarted) { _exitStarted = true; _ = CompleteExitAsync(); }
+            return;
+        }
         _interactionTimer.Stop();
         _animationTimer.Stop();
+        _idleTimer.Stop();
+        _dockObserveTimer.Stop();
         _aiTimer.Stop();
         AiCoordinator?.Dispose();
+        _speech.Close();
         base.OnClosing(e);
+    }
+    private async Task CompleteExitAsync()
+    {
+        try { await BeforeExit!(); }
+        catch { /* Cleanup is best effort; never expose private exception text. */ }
+        finally { _exitReady = true; Close(); }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -191,17 +240,28 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         {
             Debug.WriteLine($"Initial native pet placement failed; keeping WPF startup placement: {exception}");
         }
+        UpdateFacing();
+        _currentFrame = "";
+        RenderAnimationFrame();
     }
 
-    private void PetWindow_OnLocationChanged(object? sender, EventArgs e) => QueuePlacementReconcile();
+    private void PetWindow_OnLocationChanged(object? sender, EventArgs e)
+    {
+        UpdateFacing();
+        if (_facing.IsTurning) WakeAnimation();
+        QueuePlacementReconcile();
+        PositionSpeech();
+    }
 
     private void PetWindow_OnDpiChanged(object sender, WpfDpiChangedEventArgs e)
     {
         if (!IsLoaded) return;
+        if (_restoringPlacement) { SetNormalImageLayout(); PositionSpeech(); return; }
         ResetDocking();
         _skipDockOnce = true;
         _dockSuppressedUntilDrag = true;
         QueuePlacementReconcile();
+        PositionSpeech();
     }
 
     private void MonitorDisplayProvider_OnDisplaySettingsChanged(object? sender, EventArgs e)
@@ -219,6 +279,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
                 _skipDockOnce = true;
                 _dockSuppressedUntilDrag = true;
                 QueuePlacementReconcile();
+                PositionSpeech();
             }));
         }
         catch (InvalidOperationException exception)
@@ -357,6 +418,12 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
 
     private void OnInteractionEvent(PetInteractionEvent interactionEvent)
     {
+        if (interactionEvent.Type == PetInteractionEventType.Hit && !_allowHit) return;
+        if (interactionEvent.Type is PetInteractionEventType.SingleClick or PetInteractionEventType.Hit or PetInteractionEventType.RightClick)
+        {
+            InteractionTriggered?.Invoke(interactionEvent.Type);
+            if (_soundEnabled) System.Media.SystemSounds.Asterisk.Play();
+        }
         if (interactionEvent.Type != PetInteractionEventType.DragStarted) ExpandForInteraction();
         switch (interactionEvent.Type)
         {
@@ -395,11 +462,13 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
                     _dragStarted = false;
                     if (!_closed) PlayAnimation("landing");
                     if (!_closed) QueuePlacementReconcile();
+                    if (!_closed) PlacementChanged?.Invoke();
                 }
                 break;
             case PetInteractionEventType.DragCompleted:
                 PlayAnimation("landing");
                 _dragStarted = false;
+                PlacementChanged?.Invoke();
                 break;
         }
     }
@@ -409,26 +478,48 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         _animationPlayer.Play(name, _animationClock.Elapsed);
         _nextIdleAction = _animationClock.Elapsed + TimeSpan.FromSeconds(7);
         RenderAnimationFrame();
+        WakeAnimation();
+    }
+
+    private void WakeAnimation()
+    {
+        if (_closed || !IsVisible) return;
+        _idleTimer.Stop();
+        _animationTimer.Start();
+    }
+    private void ScheduleIdle()
+    {
+        if (_closed || !IsVisible || Paused || _dragStarted) return;
+        _idleTimer.Interval = TimeSpan.FromSeconds(7);
+        _idleTimer.Start();
     }
 
     private void AnimationTimer_OnTick(object? sender, EventArgs e)
     {
-        if (!IsVisible) return;
-        if (UpdateDockAnimation()) return;
-        RenderAnimationFrame();
-        if (!_dragStarted && _edgeDock.Side == DesktopPuppy.Pet.Docking.DockSide.None && _currentFrame == "idle" && _animationClock.Elapsed >= _nextIdleAction)
+        if (!IsVisible) { _animationTimer.Stop(); return; }
+        RecordAnimationTickDiagnostics(!_animationPlayer.NeedsFrames(_animationClock.Elapsed) && !_facing.IsTurning &&
+            _edgeDock.State is not (DesktopPuppy.Pet.Docking.DockState.Collapsing or DesktopPuppy.Pet.Docking.DockState.Expanding) &&
+            _animationClock.Elapsed >= _edgeBlinkUntil);
+        UpdateFacing();
+        if (!UpdateDockAnimation()) RenderAnimationFrame();
+        var dockTransition = _edgeDock.State is DesktopPuppy.Pet.Docking.DockState.Collapsing or DesktopPuppy.Pet.Docking.DockState.Expanding;
+        if (!_animationPlayer.NeedsFrames(_animationClock.Elapsed) && !_facing.IsTurning && !dockTransition && _animationClock.Elapsed >= _edgeBlinkUntil)
         {
-            string[] idleActions = ["blink", "blink", "happy", "blink", "greeting"];
-            PlayAnimation(idleActions[_idleIndex++ % idleActions.Length]);
+            _animationTimer.Stop();
+            PublishAnimationDiagnostics();
+            ScheduleIdle();
         }
     }
 
     private void RenderAnimationFrame()
     {
+        if (RenderTurnFrame()) return;
+        System.Windows.Automation.AutomationProperties.SetItemStatus(PetImage, FacesRight ? "facing-right" : "facing-left");
         var frame = _animationPlayer.FrameAt(_animationClock.Elapsed);
+        SetNormalImageLayout();
         if (frame == _currentFrame) return;
         _currentFrame = frame;
-        PetImage.Source = _animationImages[frame];
+        PetImage.Source = FacesRight ? _rightFacingImages[frame] : _animationImages[frame];
         System.Windows.Automation.AutomationProperties.SetName(PetImage, frame);
     }
 
@@ -459,29 +550,13 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
         BubbleText.Text = text;
         System.Windows.Automation.AutomationProperties.SetName(BubbleText, text);
         BubbleBorder.Visibility = Visibility.Visible;
+        RefreshSpeech();
     }
 
-    private void BubbleCloseButton_OnClick(object sender, RoutedEventArgs e)
+    private void CloseBubble()
     {
         AiCoordinator?.InvalidateBubble();
         BubbleBorder.Visibility = Visibility.Collapsed;
-        e.Handled = true;
-    }
-
-    private void StatisticsButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        StatisticsRequested?.Invoke(this, EventArgs.Empty);
-        e.Handled = true;
-    }
-
-    private void AiSettingsButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        AiSettingsRequested?.Invoke(this, EventArgs.Empty);
-        e.Handled = true;
-    }
-
-    private void CloseButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        Close();
+        RefreshSpeech();
     }
 }

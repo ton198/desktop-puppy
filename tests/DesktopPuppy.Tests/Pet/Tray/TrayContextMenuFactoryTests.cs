@@ -17,7 +17,7 @@ public sealed class TrayContextMenuFactoryTests
         {
             using var menu = TrayContextMenuFactory.Create(_ => { });
             Assert.Equal(
-                ["Show Desktop Puppy", "Hide Desktop Puppy", "Usage Statistics", "AI 设置", "<separator>", "Exit Desktop Puppy"],
+                ["Show Desktop Puppy", "Hide Desktop Puppy", "Usage Statistics", "AI 设置", "暂停 / 恢复", "设置", "说一句", "今日日报", "日报历史", "<separator>", "Exit Desktop Puppy"],
                 menu.Items.Cast<ToolStripItem>().Select(item => item is ToolStripSeparator ? "<separator>" : item.Text));
         });
     }
@@ -34,7 +34,7 @@ public sealed class TrayContextMenuFactoryTests
             using var menu = TrayContextMenuFactory.Create(commands.Add);
             foreach (var item in menu.Items.OfType<ToolStripMenuItem>()) item.PerformClick();
             Assert.Equal(
-                [TrayIconCommand.ShowPet, TrayIconCommand.HidePet, TrayIconCommand.OpenStatistics, TrayIconCommand.OpenAiSettings, TrayIconCommand.Exit],
+                [TrayIconCommand.ShowPet, TrayIconCommand.HidePet, TrayIconCommand.OpenStatistics, TrayIconCommand.OpenAiSettings, TrayIconCommand.TogglePause, TrayIconCommand.OpenSettings, TrayIconCommand.RequestSpeech, TrayIconCommand.TodayReport, TrayIconCommand.ReportHistory, TrayIconCommand.Exit],
                 commands);
         });
     }

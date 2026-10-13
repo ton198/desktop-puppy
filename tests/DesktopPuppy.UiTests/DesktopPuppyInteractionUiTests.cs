@@ -14,9 +14,9 @@ public sealed class DesktopPuppyInteractionUiTests
 
         harness.RightClickCenter();
 
-        var notice = harness.WaitForAutomationName(window, "AiNotice", name => name.Contains("配置"), TimeSpan.FromSeconds(5));
+        var notice = harness.WaitForAutomationName(harness.WaitForSpeechWindow(), "AiNotice", name => name.Contains("配置"), TimeSpan.FromSeconds(5));
         Assert.Contains("Key", notice);
-        harness.WaitForAutomationIdToDisappear(window, "SpeechBubbleText", TimeSpan.FromSeconds(2));
+        harness.WaitForAutomationIdToDisappear(harness.WaitForSpeechWindow(), "SpeechBubbleText", TimeSpan.FromSeconds(2));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class DesktopPuppyInteractionUiTests
 
         harness.DoubleClickCenter();
 
-        var bubbleText = harness.WaitForAutomationId(window, "SpeechBubbleText", TimeSpan.FromSeconds(2));
+        var bubbleText = harness.WaitForAutomationId(harness.WaitForSpeechWindow(), "SpeechBubbleText", TimeSpan.FromSeconds(2));
         Assert.Contains("嗷", bubbleText.Current.Name);
     }
 

@@ -17,6 +17,15 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
     private FormsNotifyIcon? _notifyIcon;
     private Icon? _icon;
     private bool _disposed;
+    public string Tooltip { get; init; } = "Desktop Puppy";
+    private Action? _notificationClick;
+    public void Notify(string text, Action activate)
+    {
+        VerifyDispatcherAccess();
+        if (_disposed || _notifyIcon is null) return;
+        _notificationClick = activate;
+        _notifyIcon.ShowBalloonTip(8000, "Desktop Puppy", text, ToolTipIcon.Info);
+    }
 
     public event EventHandler<TrayIconCommandEventArgs>? CommandRequested;
 
@@ -34,9 +43,10 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
             _menu = TrayContextMenuFactory.Create(OnCommandRequested);
             _notifyIcon = new FormsNotifyIcon();
             _notifyIcon.Icon = _icon;
-            _notifyIcon.Text = "Desktop Puppy";
+            _notifyIcon.Text = Tooltip;
             _notifyIcon.ContextMenuStrip = _menu;
             _notifyIcon.Visible = true;
+            _notifyIcon.BalloonTipClicked += NotificationClicked;
         }
         catch
         {
@@ -58,6 +68,8 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
         _menu = null;
         _notifyIcon = null;
         _icon = null;
+        _notificationClick = null;
+        if (notifyIcon is not null) notifyIcon.BalloonTipClicked -= NotificationClicked;
 
         TrayResourceCleanup.Run(
             () =>
@@ -86,4 +98,5 @@ public sealed class WinFormsTrayIconHost : ITrayIconHost
 
     private void OnCommandRequested(TrayIconCommand command) =>
         CommandRequested?.Invoke(this, new TrayIconCommandEventArgs(command));
+    private void NotificationClicked(object? sender, EventArgs e) => _notificationClick?.Invoke();
 }

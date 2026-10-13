@@ -20,8 +20,10 @@ public sealed class SingleBubbleRequestGate
 
 public sealed class PetVisibilityState
 {
+    public bool UserHidden => _userHidden;
+    public bool StartupWaiting { get; set; }
     private bool _userHidden, _fullscreen;
-    public bool ShouldShow => !_userHidden && !_fullscreen;
+    public bool ShouldShow => !_userHidden && !_fullscreen && !StartupWaiting;
     public void SetUserHidden(bool hidden) => _userHidden = hidden;
     public void SetFullscreen(bool fullscreen) => _fullscreen = fullscreen;
 }

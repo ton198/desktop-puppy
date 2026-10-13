@@ -6,6 +6,11 @@ public enum TrayIconCommand
     HidePet,
     OpenStatistics,
     OpenAiSettings,
+    TogglePause,
+    OpenSettings,
+    RequestSpeech,
+    TodayReport,
+    ReportHistory,
     Exit
 }
 

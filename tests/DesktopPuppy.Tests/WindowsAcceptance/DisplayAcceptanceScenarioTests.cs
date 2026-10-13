@@ -62,7 +62,7 @@ public sealed class DisplayAcceptanceScenarioTests
         var monitors = scenario.GetMonitors();
         var first = scenario.Observe("Display 1", PetHwnd, AppProcessId, appIsRunning: true);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 144,
-            new PhysicalRect(2020, 100, 2410, 415)));
+            new PhysicalRect(2020, 100, 2154, 287)));
         var second = scenario.Observe("Display 2", PetHwnd, AppProcessId, appIsRunning: true);
 
         var result = DisplayAcceptanceScenario.Validate(monitors, [first, second], AppProcessId);
@@ -85,7 +85,7 @@ public sealed class DisplayAcceptanceScenarioTests
         var monitors = scenario.GetMonitors();
         var first = scenario.Observe("Display 1", PetHwnd, AppProcessId, appIsRunning: true);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 120,
-            new PhysicalRect(2020, 100, 2345, 363)));
+            new PhysicalRect(2020, 100, 2131, 256)));
         var second = scenario.Observe("Display 2", PetHwnd, AppProcessId, appIsRunning: true);
 
         var result = DisplayAcceptanceScenario.Validate(monitors, [first, second], AppProcessId);
@@ -130,7 +130,7 @@ public sealed class DisplayAcceptanceScenarioTests
         var secondScenario = new DisplayAcceptanceScenario(api);
         var differentHwnd = new IntPtr(102);
         api.SetWindow(differentHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 144,
-            new PhysicalRect(2020, 100, 2410, 415)));
+            new PhysicalRect(2020, 100, 2154, 287)));
         var second = secondScenario.Observe("Display 2", differentHwnd, AppProcessId, appIsRunning: true);
         var result = DisplayAcceptanceScenario.Validate(monitors, [first, second], AppProcessId);
 
@@ -154,7 +154,7 @@ public sealed class DisplayAcceptanceScenarioTests
         var monitors = scenario.GetMonitors();
         var first = scenario.Observe("Display 1", PetHwnd, AppProcessId, appIsRunning: true);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 144,
-            new PhysicalRect(3825, 100, 4215, 415)));
+            new PhysicalRect(3825, 100, 3959, 287)));
         var second = scenario.Observe("Display 2", PetHwnd, AppProcessId, appIsRunning: true);
 
         var result = DisplayAcceptanceScenario.Validate(monitors, [first, second], AppProcessId);
@@ -220,11 +220,11 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var request = new DisplayRemovalRequest(
             "Display 2", "opaque-target-device", "Display 1", "opaque-primary-device",
-            new PhysicalRect(3500, 900, 3825, 1163), WorkAreaOne, PetHwnd, AppProcessId, 0);
+            new PhysicalRect(3500, 900, 3611, 1056), WorkAreaOne, PetHwnd, AppProcessId, 0);
         var primary = new DisplayAcceptanceMonitor(
             "Display 1", "opaque-primary-device", new PhysicalRect(0, 0, 1920, 1080), WorkAreaOne, true);
         var actual = new DisplayAcceptanceObservation(
-            "Display 2", PetHwnd, AppProcessId, 144, new PhysicalRect(1900, 900, 2290, 1215),
+            "Display 2", PetHwnd, AppProcessId, 144, new PhysicalRect(1900, 900, 2034, 1087),
             "Display 1", primary.Bounds, primary.WorkArea);
 
         var result = DisplayAcceptanceScenario.ValidateRemovalRecovery(
@@ -244,11 +244,11 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var request = new DisplayRemovalRequest(
             "Display 2", "opaque-target-device", "Display 1", "opaque-primary-device",
-            new PhysicalRect(3500, 900, 3825, 1163), WorkAreaOne, PetHwnd, AppProcessId, 0);
+            new PhysicalRect(3500, 900, 3611, 1056), WorkAreaOne, PetHwnd, AppProcessId, 0);
         var primary = new DisplayAcceptanceMonitor(
             "Display 1", "opaque-primary-device", new PhysicalRect(0, 0, 1920, 1080), WorkAreaOne, true);
         var actual = new DisplayAcceptanceObservation(
-            "Display 2", PetHwnd, AppProcessId, 144, new PhysicalRect(1899, 901, 2289, 1216),
+            "Display 2", PetHwnd, AppProcessId, 144, new PhysicalRect(1899, 901, 2033, 1088),
             "Display 1", primary.Bounds, primary.WorkArea);
 
         var result = DisplayAcceptanceScenario.ValidateRemovalRecovery(
@@ -265,7 +265,7 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var request = CreateRemovalRequest();
         var primary = CreatePrimaryMonitor();
-        var actual = CreateFallbackObservation(primary) with { Bounds = new PhysicalRect(1898, 900, 2288, 1215) };
+        var actual = CreateFallbackObservation(primary) with { Bounds = new PhysicalRect(1898, 900, 2032, 1087) };
 
         var result = DisplayAcceptanceScenario.ValidateRemovalRecovery(
             request, [primary], actual, AppProcessId, appIsRunning: true);
@@ -333,7 +333,7 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var request = CreateRemovalRequest();
         var primary = CreatePrimaryMonitor();
-        var actual = CreateFallbackObservation(primary) with { Bounds = new PhysicalRect(1901, 900, 2291, 1215) };
+        var actual = CreateFallbackObservation(primary) with { Bounds = new PhysicalRect(1901, 900, 2035, 1087) };
 
         var result = DisplayAcceptanceScenario.ValidateRemovalRecovery(
             request, [primary], actual, AppProcessId, appIsRunning: true);
@@ -350,7 +350,7 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var api = CreateApi();
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 120,
-            new PhysicalRect(3500, 900, 3825, 1163)));
+            new PhysicalRect(3500, 900, 3611, 1056)));
         var scenario = new DisplayAcceptanceScenario(api);
         var request = await scenario.CaptureRemovalRequestAsync("Display 2", PetHwnd, AppProcessId,
             () => true, CancellationToken.None);
@@ -362,7 +362,7 @@ public sealed class DisplayAcceptanceScenarioTests
         api.SetMonitors([new NativeDisplaySnapshot(
             MonitorOne, new PhysicalRect(0, 0, 1920, 1080), WorkAreaOne, true)]);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorOne, "PetWindow", 144,
-            new PhysicalRect(1900, 900, 2290, 1215)));
+            new PhysicalRect(1900, 900, 2034, 1087)));
         api.RaiseDisplaySettingsChanged();
 
         var result = await recovery.WaitAsync(TimeSpan.FromSeconds(2));
@@ -382,14 +382,14 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var api = CreateApi();
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 120,
-            new PhysicalRect(3500, 900, 3825, 1163)));
+            new PhysicalRect(3500, 900, 3611, 1056)));
         var scenario = new DisplayAcceptanceScenario(api);
         var request = await scenario.CaptureRemovalRequestAsync("Display 2", PetHwnd, AppProcessId,
             () => true, CancellationToken.None);
         api.SetMonitors([new NativeDisplaySnapshot(
             MonitorOne, new PhysicalRect(0, 0, 1920, 1080), WorkAreaOne, true)]);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorOne, "PetWindow", 144,
-            new PhysicalRect(1900, 900, 2290, 1215)));
+            new PhysicalRect(1900, 900, 2034, 1087)));
         api.FailNextEnumerations(1);
         api.RaiseDisplaySettingsChanged();
 
@@ -442,7 +442,7 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var api = CreateApi();
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 120,
-            new PhysicalRect(3500, 900, 3825, 1163)));
+            new PhysicalRect(3500, 900, 3611, 1056)));
         var scenario = new DisplayAcceptanceScenario(api);
         var request = await scenario.CaptureRemovalRequestAsync("Display 2", PetHwnd, AppProcessId,
             () => true, CancellationToken.None);
@@ -465,7 +465,7 @@ public sealed class DisplayAcceptanceScenarioTests
     {
         var api = CreateApi();
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorTwo, "PetWindow", 120,
-            new PhysicalRect(3500, 900, 3825, 1163)));
+            new PhysicalRect(3500, 900, 3611, 1056)));
         var scenario = new DisplayAcceptanceScenario(api);
         var request = await scenario.CaptureRemovalRequestAsync("Display 2", PetHwnd, AppProcessId,
             () => true, CancellationToken.None);
@@ -482,13 +482,13 @@ public sealed class DisplayAcceptanceScenarioTests
 
     private static DisplayRemovalRequest CreateRemovalRequest() => new(
         "Display 2", "opaque-target-device", "Display 1", "opaque-primary-device",
-        new PhysicalRect(3500, 900, 3890, 1215), WorkAreaOne, PetHwnd, AppProcessId, 0);
+        new PhysicalRect(3500, 900, 3634, 1087), WorkAreaOne, PetHwnd, AppProcessId, 0);
 
     private static DisplayAcceptanceMonitor CreatePrimaryMonitor() => new(
         "Display 1", "opaque-primary-device", new PhysicalRect(0, 0, 1920, 1080), WorkAreaOne, true);
 
     private static DisplayAcceptanceObservation CreateFallbackObservation(DisplayAcceptanceMonitor primary) => new(
-        "Display 1", PetHwnd, AppProcessId, 144, new PhysicalRect(1900, 900, 2290, 1215),
+        "Display 1", PetHwnd, AppProcessId, 144, new PhysicalRect(1900, 900, 2034, 1087),
         primary.Alias, primary.Bounds, primary.WorkArea);
 
     private static FakeDisplayAcceptanceNativeApi CreateApi()
@@ -499,7 +499,7 @@ public sealed class DisplayAcceptanceScenarioTests
             new NativeDisplaySnapshot(MonitorTwo, new PhysicalRect(1920, 0, 3840, 1080), WorkAreaTwo, false)
         ]);
         api.SetWindow(PetHwnd, new FakeWindowState(AppProcessId, MonitorOne, "PetWindow", 120,
-            new PhysicalRect(100, 100, 425, 363)));
+            new PhysicalRect(100, 100, 211, 256)));
         return api;
     }
 

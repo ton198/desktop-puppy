@@ -10,12 +10,12 @@ public sealed class AiPipeline(IAiContentProvider content, IJevDecisionProvider 
             cancellationToken.ThrowIfCancellationRequested(); generation++;
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(TimeSpan.FromSeconds(8));
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); timeout.CancelAfter(AiSceneProfile.For(scene.Kind).GenerationTimeout);
                 var batch = await content.GenerateAsync(scene, pool.ToArray(), generation, timeout.Token).ConfigureAwait(false);
                 if (batch.Count != 6) throw new AiProviderException("CandidateCount");
                 foreach (var c in batch)
                 {
-                    if (validator.IsValid(c, pool, scene.Recent)) pool.Add(c with { Id = $"c{generation}_{pool.Count}" });
+                    if ((string.IsNullOrEmpty(scene.RequiredStyle) || c.Style == scene.RequiredStyle) && validator.IsValid(c, pool, scene.Recent, AiSceneProfile.For(scene.Kind))) pool.Add(c with { Id = $"c{generation}_{pool.Count}" });
                 }
                 saveCandidates(pool);
             }

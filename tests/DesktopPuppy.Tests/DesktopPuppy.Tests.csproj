@@ -17,6 +17,7 @@
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.13" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
     <ProjectReference Include="..\..\src\DesktopPuppy\DesktopPuppy.csproj" />
     <ProjectReference Include="..\DesktopPuppy.WindowsAcceptance.Core\DesktopPuppy.WindowsAcceptance.Core.csproj" />
     <ProjectReference Include="..\DesktopPuppy.WindowsAcceptance\DesktopPuppy.WindowsAcceptance.csproj" />

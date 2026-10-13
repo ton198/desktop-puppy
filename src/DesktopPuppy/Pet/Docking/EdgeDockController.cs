@@ -11,7 +11,6 @@ public sealed class EdgeDockController
     public double Progress { get; private set; }
     private double _from, _target;
     private TimeSpan _started;
-    private TimeSpan? _leftAt;
 
     public static DockSide Detect(double left, double right, double workLeft, double workRight, double dpiScale)
     {
@@ -37,7 +36,6 @@ public sealed class EdgeDockController
         if (Side == DockSide.None) return;
         Progress = _from = _target = 0;
         _started = now;
-        _leftAt = null;
         State = DockState.Expanded;
     }
 
@@ -46,23 +44,13 @@ public sealed class EdgeDockController
         Side = DockSide.None;
         State = DockState.Free;
         Progress = _from = _target = 0;
-        _leftAt = null;
     }
 
     public void Update(TimeSpan now, bool pointerInside, bool protectedInteraction)
     {
         if (Side == DockSide.None) return;
         Sample(now);
-        if (pointerInside || protectedInteraction)
-        {
-            _leftAt = null;
-            MoveTo(0, now);
-        }
-        else if (_target == 0)
-        {
-            _leftAt ??= now;
-            if (now - _leftAt.Value >= TimeSpan.FromMilliseconds(800)) MoveTo(1, now);
-        }
+        MoveTo(pointerInside || protectedInteraction ? 0 : 1, now);
     }
 
     private void MoveTo(double target, TimeSpan now)
@@ -76,8 +64,9 @@ public sealed class EdgeDockController
 
     private void Sample(TimeSpan now)
     {
-        var t = Math.Clamp((now - _started).TotalMilliseconds / 250, 0, 1);
-        var eased = 1 - Math.Pow(1 - t, 3);
+        var duration = _target == 0 ? 350 : 250;
+        var t = Math.Clamp((now - _started).TotalMilliseconds / duration, 0, 1);
+        var eased = t * t * (3 - 2 * t);
         Progress = _from + (_target - _from) * eased;
         if (t >= 1) State = _target == 1 ? DockState.Collapsed : DockState.Expanded;
     }

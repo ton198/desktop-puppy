@@ -15,7 +15,7 @@ public sealed class AiSettingsWindowUiTests
         Assert.False(string.IsNullOrWhiteSpace(executable));
         using var harness=DesktopPuppyUiHarness.Start(executable!,seed.DatabasePath);
         var pet=harness.WaitForPetWindow(TimeSpan.FromSeconds(5));
-        harness.Invoke(harness.FindByAutomationId(pet,"AiSettingsButton"));
+        harness.InvokeTrayMenu("AI 设置");
         var settings=harness.WaitForTopLevelWindow("AiSettingsWindow",TimeSpan.FromSeconds(5));
         harness.WaitForAutomationName(settings,"DeepSeekKeyStatus",name=>name=="未配置",TimeSpan.FromSeconds(5));
         harness.WaitForAutomationName(settings,"JevKeyStatus",name=>name=="未配置",TimeSpan.FromSeconds(5));
@@ -25,7 +25,7 @@ public sealed class AiSettingsWindowUiTests
         harness.Invoke(harness.FindByAutomationId(settings,"SaveAiSettings"));
         harness.WaitForAutomationName(settings,"AiSettingsStatus",name=>name=="设置已保存。",TimeSpan.FromSeconds(5));
         Assert.False(new AiSqliteStore(seed.DatabasePath).LoadSettings().Enabled);
-        harness.Invoke(harness.FindByAutomationId(pet,"AiSettingsButton"));
+        harness.InvokeTrayMenu("AI 设置");
         Assert.Equal(1,harness.CountTopLevelWindows("AiSettingsWindow"));
     }
 
@@ -35,12 +35,12 @@ public sealed class AiSettingsWindowUiTests
     {
         var executable=Environment.GetEnvironmentVariable("DESKTOP_PUPPY_EXE"); Assert.False(string.IsNullOrWhiteSpace(executable));
         using var harness=DesktopPuppyUiHarness.Start(executable!);
-        var pet=harness.WaitForPetWindow(TimeSpan.FromSeconds(5)); harness.SingleClickCenter();
-        var original = harness.WaitForAutomationId(pet,"SpeechBubbleText",TimeSpan.FromSeconds(3)).Current.Name;
+        var pet=harness.WaitForPetWindow(TimeSpan.FromSeconds(5)); harness.WaitForAutomationName(pet,"PetAnimation",n=>n=="idle",TimeSpan.FromSeconds(4)); harness.SingleClickCenter();
+        var original = harness.WaitForAutomationId(harness.WaitForSpeechWindow(),"SpeechBubbleText",TimeSpan.FromSeconds(3)).Current.Name;
         harness.RightClickCenter();
-        harness.WaitForAutomationName(pet,"AiNotice",name=>name.Contains("配置"),TimeSpan.FromSeconds(5));
-        Assert.Equal(original, harness.FindByAutomationId(pet,"SpeechBubbleText").Current.Name);
-        harness.Invoke(harness.FindByAutomationId(pet,"CloseBubbleButton"));
-        harness.WaitForAutomationIdToDisappear(pet,"SpeechBubbleText",TimeSpan.FromSeconds(2));
+        harness.WaitForAutomationName(harness.WaitForSpeechWindow(),"AiNotice",name=>name.Contains("配置"),TimeSpan.FromSeconds(5));
+        Assert.Equal(original, harness.FindByAutomationId(harness.WaitForSpeechWindow(),"SpeechBubbleText").Current.Name);
+        harness.Invoke(harness.FindByAutomationId(harness.WaitForSpeechWindow(),"CloseBubbleButton"));
+        harness.WaitForAutomationIdToDisappear(harness.WaitForSpeechWindow(),"SpeechBubbleText",TimeSpan.FromSeconds(2));
     }
 }

@@ -4,10 +4,6 @@
         Title="Desktop Puppy"
         AutomationProperties.AutomationId="PetWindow"
         AutomationProperties.Name="Desktop Puppy"
-        Width="260"
-        Height="210"
-        MinWidth="200"
-        MinHeight="170"
         WindowStyle="None"
         ResizeMode="NoResize"
         AllowsTransparency="True"
@@ -19,100 +15,8 @@
         MouseMove="PetWindow_OnMouseMove"
         MouseLeftButtonUp="PetWindow_OnMouseLeftButtonUp"
         MouseRightButtonDown="PetWindow_OnMouseRightButtonDown">
-    <Window.Resources>
-        <Style x:Key="ChromeButton" TargetType="Button">
-            <Setter Property="Width" Value="26" />
-            <Setter Property="Height" Value="26" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,4,4,0" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="#FFF8FAFC" />
-            <Setter Property="Background" Value="#660F172A" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Cursor" Value="Hand" />
-        </Style>
-        <Style x:Key="BubbleButton" TargetType="Button" BasedOn="{StaticResource ChromeButton}">
-            <Setter Property="Width" Value="22" />
-            <Setter Property="Height" Value="22" />
-            <Setter Property="Margin" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#FF334155" />
-            <Setter Property="FontSize" Value="13" />
-        </Style>
-    </Window.Resources>
-
-    <Grid x:Name="PetRoot" ClipToBounds="True" AutomationProperties.AutomationId="PetSurface">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <StackPanel x:Name="PetChrome" Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
-            <Button Content="AI" Width="32" Style="{StaticResource ChromeButton}"
-                    ToolTip="AI 设置" AutomationProperties.AutomationId="AiSettingsButton"
-                    AutomationProperties.Name="打开 AI 设置" Click="AiSettingsButton_OnClick"/>
-            <Button x:Name="StatisticsButton"
-                    AutomationProperties.AutomationId="StatisticsButton"
-                    AutomationProperties.Name="打开使用统计"
-                    Style="{StaticResource ChromeButton}"
-                    Width="48"
-                    FontSize="12"
-                    Content="统计"
-                    ToolTip="打开使用统计"
-                    Click="StatisticsButton_OnClick" />
-            <Button x:Name="CloseButton"
-                    AutomationProperties.AutomationId="CloseButton"
-                    AutomationProperties.Name="退出 Desktop Puppy"
-                    Style="{StaticResource ChromeButton}"
-                    Content="×"
-                    ToolTip="退出 Desktop Puppy"
-                    Click="CloseButton_OnClick" />
-        </StackPanel>
-
-        <Grid Grid.Row="1" Margin="12,0,12,12">
-            <TextBlock x:Name="AiNotice" AutomationProperties.AutomationId="AiNotice"
-                       Panel.ZIndex="3" TextWrapping="Wrap" Background="#FFF8FAFC" Foreground="#FF334155"
-                       Padding="8" MaxWidth="225" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"/>
-            <Border x:Name="BubbleBorder"
-                    AutomationProperties.AutomationId="SpeechBubble"
-                    Panel.ZIndex="2"
-                    Padding="12,9,8,9"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Top"
-                    MaxWidth="225"
-                    Background="#FFF8FAFC"
-                    BorderBrush="#FFCBD5E1"
-                    BorderThickness="1"
-                    CornerRadius="14"
-                    Visibility="Collapsed">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="BubbleText"
-                               AutomationProperties.AutomationId="SpeechBubbleText"
-                               Grid.Column="0"
-                               MaxWidth="183"
-                               Foreground="#FF172033"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               TextWrapping="Wrap" />
-                    <Button Grid.Column="1"
-                            AutomationProperties.AutomationId="CloseBubbleButton"
-                            AutomationProperties.Name="关闭气泡"
-                            Style="{StaticResource BubbleButton}"
-                            Content="×"
-                            ToolTip="关闭气泡"
-                            Click="BubbleCloseButton_OnClick" />
-                </Grid>
-            </Border>
-
-            <Image x:Name="PetImage" Width="132" Height="132"
-                   Margin="0,34,0,0" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                   Stretch="Uniform" AutomationProperties.AutomationId="PetAnimation"
-                   AutomationProperties.Name="idle" />
-        </Grid>
-    </Grid>
+    <Canvas x:Name="PetRoot" ClipToBounds="True" AutomationProperties.AutomationId="PetSurface">
+        <Image x:Name="PetImage" Width="132" Height="132" Stretch="Uniform"
+               AutomationProperties.AutomationId="PetAnimation" AutomationProperties.Name="idle" />
+    </Canvas>
 </Window>
