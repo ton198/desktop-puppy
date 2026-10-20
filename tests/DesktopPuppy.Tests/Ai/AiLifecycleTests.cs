@@ -58,4 +58,28 @@ public sealed class AiLifecycleTests
         Assert.True(FullscreenPolicy.ShouldSuppress(3, [], screens));
         Assert.False(FullscreenPolicy.ShouldSuppress(2, [], screens)); // busy/presentation is not evidence of a fullscreen window
     }
+
+    [Theory]
+    [InlineData(0x00000020L)] // WS_EX_TRANSPARENT: click-through overlay
+    [InlineData(0x00000080L)] // WS_EX_TOOLWINDOW: auxiliary tool, not a fullscreen app
+    [InlineData(0x08000000L)] // WS_EX_NOACTIVATE: passive overlay
+    [InlineData(0x080800A0L)] // transparent layered tool overlay used in the EXE reproduction
+    public void Screen_covering_overlay_does_not_hide_pet(long extendedStyle)
+    {
+        var screen = new PhysicalRect(0, 0, 2560, 1600);
+        var overlay = new FullscreenWindowInfo(screen, true, false, false, false, false, extendedStyle);
+        Assert.False(FullscreenPolicy.IsBorderlessFullscreen(overlay, [screen]));
+        Assert.False(FullscreenPolicy.ShouldSuppress(2, [overlay], [screen]));
+    }
+
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(0x00000008L)] // WS_EX_TOPMOST alone is normal for fullscreen applications
+    [InlineData(0x00080000L)] // WS_EX_LAYERED alone does not imply a passive overlay
+    public void Ordinary_fullscreen_still_hides_pet_when_taskbar_is_auto_hidden(long extendedStyle)
+    {
+        var screen = new PhysicalRect(0, 0, 2560, 1600);
+        var fullscreen = new FullscreenWindowInfo(screen, true, false, false, false, false, extendedStyle);
+        Assert.True(FullscreenPolicy.ShouldSuppress(2, [fullscreen], [screen]));
+    }
 }

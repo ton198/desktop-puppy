@@ -128,7 +128,7 @@ public sealed class UsageStatisticsRefreshE2ETests
 
     private static void OpenStatistics(DesktopPuppyUiHarness harness, AutomationElement petWindow)
     {
-        harness.InvokeTrayMenu("Usage Statistics");
+        harness.InvokeTrayMenu("使用统计");
     }
 
     private static DesktopPuppyUiHarness StartHarness(string usageDatabasePath)

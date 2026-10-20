@@ -3,10 +3,12 @@ using System.Text;
 
 namespace DesktopPuppy.Native;
 
-public sealed record FullscreenWindowInfo(PhysicalRect Bounds, bool Visible, bool Minimized, bool Cloaked, bool Framed, bool IsDesktop);
+public sealed record FullscreenWindowInfo(PhysicalRect Bounds, bool Visible, bool Minimized, bool Cloaked, bool Framed, bool IsDesktop, long ExtendedStyle = 0);
 public static class FullscreenPolicy
 {
-    public static bool IsBorderlessFullscreen(FullscreenWindowInfo window, IReadOnlyList<PhysicalRect> monitors) => window.Visible && !window.Minimized && !window.Cloaked && !window.Framed && !window.IsDesktop && monitors.Any(m =>
+    // Passive overlays can cover an entire monitor without being fullscreen applications.
+    private const long OverlayStyles = 0x00000020L | 0x00000080L | 0x08000000L; // TRANSPARENT, TOOLWINDOW, NOACTIVATE
+    public static bool IsBorderlessFullscreen(FullscreenWindowInfo window, IReadOnlyList<PhysicalRect> monitors) => window.Visible && !window.Minimized && !window.Cloaked && !window.Framed && !window.IsDesktop && (window.ExtendedStyle & OverlayStyles) == 0 && monitors.Any(m =>
         Math.Abs((long)m.Left - window.Bounds.Left) <= 1 && Math.Abs((long)m.Top - window.Bounds.Top) <= 1 && Math.Abs((long)m.Right - window.Bounds.Right) <= 1 && Math.Abs((long)m.Bottom - window.Bounds.Bottom) <= 1);
     public static bool ShouldSuppress(int shellState, IReadOnlyList<FullscreenWindowInfo> windows, IReadOnlyList<PhysicalRect> monitors) => shellState == 3 || windows.Any(w => IsBorderlessFullscreen(w, monitors));
 }
@@ -14,21 +16,32 @@ public static class FullscreenPolicy
 public interface IFullscreenDetector { bool IsFullscreen(); }
 public sealed class Win32FullscreenDetector(IMonitorDisplayProvider monitors) : IFullscreenDetector
 {
+    public string LastReason { get; private set; } = "NotChecked";
     public bool IsFullscreen()
     {
-        if (SHQueryUserNotificationState(out var state) == 0 && state == 3) return true;
+        if (SHQueryUserNotificationState(out var state) == 0 && state == 3)
+        {
+            LastReason = "ExclusiveDirect3D";
+            return true;
+        }
         var displays = monitors.GetMonitors().Select(m => m.Bounds).ToArray(); bool fullscreen = false;
+        LastReason = "NoFullscreen";
         EnumProc callback = (hwnd, _) =>
         {
             if (!IsWindowVisible(hwnd) || IsIconic(hwnd)) return true;
             GetWindowThreadProcessId(hwnd, out var pid); if (pid == (uint)Environment.ProcessId) return true;
             if (!GetWindowRect(hwnd, out var rect)) return true;
             var style = IntPtr.Size == 8 ? GetWindowLongPtr(hwnd, -16).ToInt64() : GetWindowLong(hwnd, -16);
+            var extendedStyle = IntPtr.Size == 8 ? GetWindowLongPtr(hwnd, -20).ToInt64() : GetWindowLong(hwnd, -20);
             var framed = (style & (0x00C00000L | 0x00040000L | 0x01000000L)) != 0;
             DwmGetWindowAttribute(hwnd, 14, out var cloaked, sizeof(int));
             var name = new StringBuilder(256); GetClassName(hwnd, name, name.Capacity);
             var desktop = hwnd == GetShellWindow() || hwnd == GetDesktopWindow() || name.ToString() is "WorkerW" or "Progman" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
-            if (FullscreenPolicy.IsBorderlessFullscreen(new(new(rect.Left, rect.Top, rect.Right, rect.Bottom), true, false, cloaked != 0, framed, desktop), displays)) fullscreen = true;
+            if (FullscreenPolicy.IsBorderlessFullscreen(new(new(rect.Left, rect.Top, rect.Right, rect.Bottom), true, false, cloaked != 0, framed, desktop, extendedStyle), displays))
+            {
+                fullscreen = true;
+                LastReason = $"Borderless pid={pid} hwnd=0x{hwnd.ToInt64():X} style=0x{style:X} exStyle=0x{extendedStyle:X} bounds={rect.Left},{rect.Top},{rect.Right},{rect.Bottom}";
+            }
             return !fullscreen;
         };
         EnumWindows(callback, IntPtr.Zero); GC.KeepAlive(callback); return fullscreen;

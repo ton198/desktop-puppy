@@ -1,30 +1,16 @@
-<Window x:Class="DesktopPuppy.Pet.PetSpeechWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Desktop Puppy Speech" AutomationProperties.AutomationId="PetSpeechWindow"
-        WindowStyle="None" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
-        AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False"
-        ShowActivated="False" Topmost="True" Focusable="False">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="DesktopPuppy.Pet.PetSpeechWindow" Style="{StaticResource CottageWindow}" Title="Desktop Puppy Speech" AutomationProperties.AutomationId="PetSpeechWindow" WindowStyle="None" ResizeMode="NoResize" SizeToContent="WidthAndHeight" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ShowActivated="False" Topmost="True" Focusable="False">
     <StackPanel>
-        <TextBlock x:Name="AiNotice" AutomationProperties.AutomationId="AiNotice"
-                   TextWrapping="Wrap" Background="#FFF8FAFC" Foreground="#FF334155"
-                   Padding="8" MaxWidth="225" Visibility="Collapsed" IsHitTestVisible="False"/>
-        <Border x:Name="BubbleBorder" AutomationProperties.AutomationId="SpeechBubble"
-                Padding="12,9,8,9" MaxWidth="225" Background="#FFF8FAFC"
-                BorderBrush="#FFCBD5E1" BorderThickness="1" CornerRadius="14" Visibility="Collapsed">
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" MaxWidth="225" Margin="0,0,0,6" Visibility="{Binding Visibility, ElementName=AiNotice}">
+            <TextBlock x:Name="AiNotice" AutomationProperties.AutomationId="AiNotice" TextWrapping="Wrap" Background="Transparent" Foreground="{StaticResource MutedBrush}" Padding="10" FontSize="12" MaxWidth="225" Visibility="Collapsed" IsHitTestVisible="False"/>
+        </Border>
+        <Border x:Name="BubbleBorder" AutomationProperties.AutomationId="SpeechBubble" Padding="12,9,8,9" MaxWidth="225" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="14" Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="BubbleText" AutomationProperties.AutomationId="SpeechBubbleText"
-                           MaxWidth="183" Foreground="#FF172033" FontSize="13"
-                           FontWeight="SemiBold" TextWrapping="Wrap"/>
-                <Button Grid.Column="1" AutomationProperties.AutomationId="CloseBubbleButton"
-                        AutomationProperties.Name="关闭气泡" Content="×" ToolTip="关闭气泡"
-                        Width="22" Height="22" Padding="0" BorderThickness="0"
-                        Background="Transparent" Foreground="#FF334155" FontSize="13"
-                        Focusable="False" Click="CloseBubble_OnClick"/>
+                <TextBlock x:Name="BubbleText" AutomationProperties.AutomationId="SpeechBubbleText" MaxWidth="183" Foreground="{StaticResource InkBrush}" FontSize="13" FontWeight="Normal" LineHeight="21" TextWrapping="Wrap"/>
+                <Button Grid.Column="1" AutomationProperties.AutomationId="CloseBubbleButton" AutomationProperties.Name="关闭气泡" Content="×" ToolTip="关闭气泡" Width="22" Height="22" FontSize="13" Focusable="False" Click="CloseBubble_OnClick" Style="{StaticResource IconButton}"/>
             </Grid>
         </Border>
     </StackPanel>

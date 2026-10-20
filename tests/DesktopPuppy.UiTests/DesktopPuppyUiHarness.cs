@@ -390,7 +390,7 @@ public sealed class DesktopPuppyUiHarness : IDisposable
     {
         AutomationElement? icon = null;
         var iconDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
-        var overflowOpened = false;
+        var nextOverflowAttempt = DateTime.MinValue;
         while (DateTime.UtcNow < iconDeadline && icon is null)
         {
             icon = FindTrayIcon();
@@ -403,10 +403,13 @@ public sealed class DesktopPuppyUiHarness : IDisposable
             var openPanel = AutomationElement.RootElement.FindFirst(TreeScope.Children,
                 new OrCondition(new PropertyCondition(AutomationElement.ClassNameProperty, "TopLevelWindowForOverflowXamlIsland"),
                     new PropertyCondition(AutomationElement.ClassNameProperty, "NotifyIconOverflowWindow")));
-            if (overflow is not null && !overflowOpened && (openPanel is null || openPanel.Current.IsOffscreen))
+            if (overflow is not null && DateTime.UtcNow >= nextOverflowAttempt && (openPanel is null || openPanel.Current.IsOffscreen))
             {
-                ClickElement(overflow, MouseButton.Left);
-                overflowOpened = true;
+                // Shell can ignore a physical click during icon registration. Observe
+                // the panel before considering it open and retry only while it is absent.
+                if (overflow.TryGetCurrentPattern(InvokePattern.Pattern, out var invoke)) ((InvokePattern)invoke).Invoke();
+                else ClickElement(overflow, MouseButton.Left);
+                nextOverflowAttempt = DateTime.UtcNow + TimeSpan.FromSeconds(1);
             }
             Thread.Sleep(50);
         }

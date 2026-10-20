@@ -43,11 +43,13 @@ public partial class App : WpfApplication
     private DispatcherTimer? _fullscreenTimer;
     private IFullscreenDetector? _fullscreenDetector;
     private bool _lastFullscreen;
+    private string? _lastFullscreenDiagnostic;
     private Timer? _aiRetentionTimer;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        DesktopPuppy.Runtime.StartupDiagnostics.Write($"Startup.Begin autoStart={e.Args.Contains("--startup")}");
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         var scope = InstanceScope.ForDatabase(Environment.GetEnvironmentVariable("DESKTOP_PUPPY_USAGE_DB_PATH"));
@@ -64,8 +66,13 @@ public partial class App : WpfApplication
             await Task.Run(() => DesktopPuppy.Data.DatabaseVersionAdmission.AssertCompatible(DatabasePath));
             _settings = new DesktopPuppy.Settings.SettingsService(DatabasePath);
             await _settings.LoadAsync();
+            DesktopPuppy.Runtime.StartupDiagnostics.Write("Startup.SettingsLoaded");
         }
-        catch { _featureInitializationFailed = true; }
+        catch (Exception exception)
+        {
+            _featureInitializationFailed = true;
+            DesktopPuppy.Runtime.StartupDiagnostics.Write($"Startup.SettingsFailed type={exception.GetType().Name}");
+        }
         if (!_featureInitializationFailed)
         {
             try { await Task.Run(StartUsageTracking); }
@@ -74,6 +81,7 @@ public partial class App : WpfApplication
 
         InitializePetWindowPlacement();
         _petWindow = new PetWindow(_petWindowPlacementService, _monitorDisplayProvider);
+        DesktopPuppy.Runtime.StartupDiagnostics.Write("Startup.PetConstructed");
         MainWindow = _petWindow;
         // Visibility suppression must precede fullscreen reconciliation, which can show
         // the window. Placement restoration is attached before its first Loaded event.
@@ -91,9 +99,11 @@ public partial class App : WpfApplication
         {
             if (_featureInitializationFailed) throw new InvalidOperationException();
             await InitializeFeaturesAsync(e.Args.Contains("--startup"));
+            DesktopPuppy.Runtime.StartupDiagnostics.Write("Startup.FeaturesReady");
         }
-        catch
+        catch (Exception exception)
         {
+            DesktopPuppy.Runtime.StartupDiagnostics.Write($"Startup.FeaturesFailed type={exception.GetType().Name}");
             _featureInitializationFailed = true;
             _featureTimer?.Stop(); _aiRetentionTimer?.Dispose(); _usageRetentionCheckTimer?.Dispose();
             _featureCancellation.Cancel();
@@ -376,16 +386,30 @@ public partial class App : WpfApplication
     {
         if (_monitorDisplayProvider is null) return;
         _fullscreenDetector = new Win32FullscreenDetector(_monitorDisplayProvider);
-        _petWindow!.FullscreenNow = CheckFullscreen;
+        _petWindow!.FullscreenNow = () => (_settings?.Current.Interaction.SuppressOnFullscreen ?? true) && CheckFullscreen();
         _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _fullscreenTimer.Tick += (_, _) => _petWindow.SetFullscreen((_settings?.Current.Interaction.SuppressOnFullscreen ?? true) && CheckFullscreen());
-        _petWindow.SetFullscreen(CheckFullscreen());
+        _petWindow.SetFullscreen((_settings?.Current.Interaction.SuppressOnFullscreen ?? true) && CheckFullscreen());
         _fullscreenTimer.Start();
     }
 
     private bool CheckFullscreen()
     {
-        try { _lastFullscreen = _fullscreenDetector?.IsFullscreen() ?? false; } catch { /* Preserve last observation on a transient failure. */ }
+        string reason;
+        try
+        {
+            _lastFullscreen = _fullscreenDetector?.IsFullscreen() ?? false;
+            reason = (_fullscreenDetector as Win32FullscreenDetector)?.LastReason ?? "DetectorUnavailable";
+        }
+        catch (Exception exception)
+        {
+            reason = $"DetectionFailed type={exception.GetType().Name} retained={_lastFullscreen}";
+        }
+        if (reason != _lastFullscreenDiagnostic)
+        {
+            _lastFullscreenDiagnostic = reason;
+            DesktopPuppy.Runtime.StartupDiagnostics.Write($"Fullscreen value={_lastFullscreen} reason={reason}");
+        }
         return _lastFullscreen;
     }
 

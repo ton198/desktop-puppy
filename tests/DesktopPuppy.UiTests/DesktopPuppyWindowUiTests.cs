@@ -25,7 +25,7 @@ public sealed class DesktopPuppyWindowUiTests
         Assert.Equal("Desktop Puppy", window.Current.Name);
         Assert.False(window.Current.IsOffscreen);
 
-        harness.InvokeTrayMenu("Exit Desktop Puppy");
+        harness.InvokeTrayMenu("退出桌宠");
         Assert.True(harness.WaitForExit(TimeSpan.FromSeconds(3)));
     }
 }

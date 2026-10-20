@@ -1,0 +1,51 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="DesktopPuppy.Reports.DailyReportWindow" Title="桌宠日报" Width="900" Height="680" MinWidth="600" MinHeight="440" Style="{StaticResource CottageWindow}" WindowStartupLocation="CenterScreen" AutomationProperties.AutomationId="DailyReportWindow">
+    <Grid Background="{StaticResource CanvasBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="28,20">
+            <StackPanel>
+                <TextBlock Text="桌宠日报" Style="{StaticResource PageTitle}"/>
+            </StackPanel>
+        </Border>
+        <Grid Grid.Row="1" Margin="20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="174"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="最近 15 天" Style="{StaticResource Hint}" Margin="12,0,0,14"/>
+                <ListBox x:Name="dates" AutomationProperties.AutomationId="ReportDateList" AutomationProperties.Name="日报日期" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding DateLabel}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding StateLabel}" Style="{StaticResource Hint}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,0" AutomationProperties.AutomationId="ReportScroll">
+                <Border Style="{StaticResource Card}" MaxWidth="660" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock x:Name="reportDate" Text="日报" Foreground="{StaticResource AccentBrush}" FontSize="13" Margin="0,0,0,12"/>
+                        <TextBlock Text="每日回顾" Style="{StaticResource PageTitle}" Margin="0,0,0,20"/>
+                        <Border Background="{StaticResource CanvasBrush}" CornerRadius="8" Padding="12" Margin="0,0,0,20">
+                            <TextBlock x:Name="status" AutomationProperties.AutomationId="ReportStatus" TextWrapping="Wrap" LineHeight="22" Foreground="{StaticResource MutedBrush}"/>
+                        </Border>
+                        <Button x:Name="retryButton" Content="重新生成" AutomationProperties.AutomationId="ReportRetry" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,0,0,20" Visibility="Collapsed"/>
+                        <TextBlock x:Name="body" AutomationProperties.AutomationId="ReportBody" TextWrapping="Wrap" FontSize="16" LineHeight="28"/>
+                        <Border x:Name="factsSection" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,28,0,0" Padding="0,12,0,0">
+                            <Expander Header="准确统计（本地计算）" AutomationProperties.AutomationId="ReportFactsExpander">
+                                <TextBox x:Name="facts" AutomationProperties.AutomationId="ReportFacts" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" BorderThickness="0" Background="Transparent" Foreground="{StaticResource MutedBrush}" Margin="0,12,0,0"/>
+                            </Expander>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

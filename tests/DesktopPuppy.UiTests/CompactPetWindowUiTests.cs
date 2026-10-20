@@ -55,15 +55,15 @@ public sealed class CompactPetWindowUiTests
         harness.WaitForAutomationName(pet, "PetAnimation", n => n == "idle", TimeSpan.FromSeconds(4));
         harness.SingleClickCenter();
         harness.WaitForSpeechWindow();
-        harness.InvokeTrayMenu("Hide Desktop Puppy");
+        harness.InvokeTrayMenu("隐藏桌宠");
         harness.WaitForTopLevelWindowToDisappear("PetWindow", TimeSpan.FromSeconds(2));
         harness.WaitForTopLevelWindowToDisappear("PetSpeechWindow", TimeSpan.FromSeconds(2));
-        harness.InvokeTrayMenu("Show Desktop Puppy");
+        harness.InvokeTrayMenu("显示桌宠");
         harness.WaitForPetWindow(TimeSpan.FromSeconds(3));
         Assert.Equal(0, harness.CountTopLevelWindows("PetSpeechWindow"));
         harness.SingleClickCenter();
         harness.WaitForSpeechWindow();
-        harness.InvokeTrayMenu("Exit Desktop Puppy");
+        harness.InvokeTrayMenu("退出桌宠");
         Assert.True(harness.WaitForExit(TimeSpan.FromSeconds(3)));
     }
 

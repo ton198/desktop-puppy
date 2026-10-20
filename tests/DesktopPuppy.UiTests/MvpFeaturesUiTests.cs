@@ -79,7 +79,7 @@ public sealed class MvpFeaturesUiTests
         using var seed=new UsageStatisticsSeed();
         using var first=DesktopPuppyUiHarness.Start(Executable,seed.DatabasePath);
         var pet=first.WaitForPetWindow(TimeSpan.FromSeconds(8));
-        first.InvokeTrayMenu("Hide Desktop Puppy");
+        first.InvokeTrayMenu("隐藏桌宠");
         using var second=DesktopPuppyUiHarness.Start(Executable,seed.DatabasePath);
         Assert.True(second.WaitForExit(TimeSpan.FromSeconds(5)));
         first.WaitForPetWindow(TimeSpan.FromSeconds(5));
@@ -92,7 +92,7 @@ public sealed class MvpFeaturesUiTests
         using var harness=DesktopPuppyUiHarness.Start(Executable,seed.DatabasePath,"--startup");
         Assert.False(harness.HasVisiblePet);
         var watch=System.Diagnostics.Stopwatch.StartNew();
-        harness.InvokeTrayMenu("Show Desktop Puppy");
+        harness.InvokeTrayMenu("显示桌宠");
         harness.WaitForPetWindow(TimeSpan.FromSeconds(3));
         Assert.True(watch.Elapsed<TimeSpan.FromSeconds(9));
     }
@@ -104,9 +104,14 @@ public sealed class MvpFeaturesUiTests
         var store=new DailyReportStore(seed.DatabasePath);
         var plan=new ReportPlan(date,DateTimeOffset.UtcNow,"常用应用","战报","tease","{\"totalMinutes\":45}");
         store.Save(new(date,ReportState.Success,plan,"测试日报：今天的窗口又被小狗巡逻过了。","",DateTimeOffset.UtcNow));
+        // At/after 18:20 the app also creates today's entry and history selects it first.
+        // Seed that case explicitly so this test checks the requested historical entry at any hour.
+        store.Save(new(date.AddDays(1),ReportState.StatisticsUnavailable,null,"","",DateTimeOffset.UtcNow));
         using var harness=DesktopPuppyUiHarness.Start(Executable,seed.DatabasePath);
         harness.WaitForPetWindow(TimeSpan.FromSeconds(8));harness.InvokeTrayMenu("日报历史");
         var window=harness.WaitForTopLevelWindow("DailyReportWindow",TimeSpan.FromSeconds(5));
+        harness.WaitForAutomationName(window,"ReportStatus",n=>!string.IsNullOrWhiteSpace(n),TimeSpan.FromSeconds(5));
+        harness.SelectListItemContaining(window,"ReportDateList",date.ToString("MM-dd"));
         harness.WaitForAutomationName(window,"ReportBody",n=>n.Contains("测试日报"),TimeSpan.FromSeconds(5));
         Assert.Equal(1,harness.CountTopLevelWindows("DailyReportWindow"));
     }
@@ -115,10 +120,10 @@ public sealed class MvpFeaturesUiTests
     {
         using var seed=new UsageStatisticsSeed();
         using var harness=DesktopPuppyUiHarness.Start(Executable,seed.DatabasePath,"--startup");
-        harness.InvokeTrayMenu("Hide Desktop Puppy");
+        harness.InvokeTrayMenu("隐藏桌宠");
         Thread.Sleep(11000);
         Assert.False(harness.HasVisiblePet);
-        harness.InvokeTrayMenu("Show Desktop Puppy");
+        harness.InvokeTrayMenu("显示桌宠");
         harness.WaitForPetWindow(TimeSpan.FromSeconds(3));
     }
     [Fact, Trait("Category","Ui")]

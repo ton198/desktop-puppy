@@ -192,7 +192,7 @@ public sealed class UsageStatisticsWindowUiTests
     }
     private static void OpenStatistics(DesktopPuppyUiHarness harness, System.Windows.Automation.AutomationElement petWindow)
     {
-        harness.InvokeTrayMenu("Usage Statistics");
+        harness.InvokeTrayMenu("使用统计");
     }
 
     private static IReadOnlyList<ForegroundSession> WaitForSessions(

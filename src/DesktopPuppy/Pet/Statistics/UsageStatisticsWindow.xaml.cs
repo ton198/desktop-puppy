@@ -18,6 +18,7 @@ public partial class UsageStatisticsWindow : Window
         ArgumentNullException.ThrowIfNull(viewModel);
 
         InitializeComponent();
+        Themes.WindowSizing.FitToWorkArea(this);
         _viewModel = viewModel;
         DataContext = viewModel;
         _refreshTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
@@ -70,6 +71,19 @@ public partial class UsageStatisticsWindow : Window
         _viewModel.SelectApplication(
             (ApplicationList.SelectedItem as ApplicationStatistics)?.ProcessName);
     }
+}
+
+public sealed class ApplicationShareConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length < 2 || values[0] is not TimeSpan duration ||
+            values[1] is not TimeSpan total || total <= TimeSpan.Zero) return 0d;
+        return Math.Clamp(duration.TotalSeconds / total.TotalSeconds * 100, 0, 100);
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }
 
 public sealed class ElapsedDurationConverter : IValueConverter

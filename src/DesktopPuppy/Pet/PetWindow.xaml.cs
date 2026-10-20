@@ -63,6 +63,7 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     private int _lineIndex;
     private bool _dragStarted;
     private readonly PetVisibilityState _visibility = new();
+    private string? _lastVisibilityDiagnostic;
     private readonly DispatcherTimer _aiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private TimeSpan _noticeDeadline;
     public RightClickAiCoordinator? AiCoordinator { get; set; }
@@ -89,6 +90,12 @@ public partial class PetWindow : Window, ITrayPetWindow, IRightClickAiView
     private void ApplyVisibility()
     {
         if (_closed) return;
+        var diagnostic = $"Visibility shouldShow={_visibility.ShouldShow} startupWaiting={_visibility.StartupWaiting} userHidden={_visibility.UserHidden}";
+        if (diagnostic != _lastVisibilityDiagnostic)
+        {
+            _lastVisibilityDiagnostic = diagnostic;
+            DesktopPuppy.Runtime.StartupDiagnostics.Write(diagnostic);
+        }
         if (_visibility.ShouldShow) { if (!IsVisible) Show(); }
         else { FinishEdgeDrag(); AiCoordinator?.InvalidateBubble(); AiNotice.Visibility = Visibility.Collapsed; if (IsVisible) Hide(); }
     }

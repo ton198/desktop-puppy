@@ -1,0 +1,213 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:settings="clr-namespace:DesktopPuppy.Core.Settings" x:Class="DesktopPuppy.Settings.SettingsWindow" Title="Desktop Puppy 设置" Width="860" Height="680" MinWidth="600" MinHeight="440" Style="{StaticResource CottageWindow}" WindowStartupLocation="CenterScreen" AutomationProperties.AutomationId="AiSettingsWindow">
+    <Grid x:Name="root" Background="{StaticResource CanvasBrush}">
+        <Grid.Resources>
+            <Style x:Key="SettingsCard" TargetType="Border" BasedOn="{StaticResource Card}">
+                <Setter Property="Margin" Value="0,0,0,16"/>
+            </Style>
+            <Style x:Key="FieldLabel" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,12,0,6"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,0,0,1" Padding="28,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="桌宠设置" Style="{StaticResource PageTitle}"/>
+                </StackPanel>
+                <Border Grid.Column="1" Background="{StaticResource ApricotBrush}" CornerRadius="16" Width="60" Height="60" Margin="16,0,0,0">
+                    <Image Source="/DesktopPuppy;component/Pet/Animation/Assets/idle.png" Width="52" Height="52"/>
+                </Border>
+            </Grid>
+        </Border>
+        <TabControl x:Name="tabs" Grid.Row="1" Style="{StaticResource NavigationTabs}" AutomationProperties.AutomationId="SettingsNavigation">
+            <TabItem Header="外观与互动">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,16">
+                    <StackPanel>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="外观" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="大小（50–200%）" Style="{StaticResource FieldLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="Scale" AutomationProperties.AutomationId="Scale" AutomationProperties.Name="大小百分比"/>
+                                    <TextBlock Grid.Column="1" Text="%" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock Text="透明度（30–100%）" Style="{StaticResource FieldLabel}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="OpacityInput" AutomationProperties.AutomationId="Opacity" AutomationProperties.Name="透明度百分比"/>
+                                    <TextBlock Grid.Column="1" Text="%" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                                </Grid>
+                                <CheckBox x:Name="TopmostInput" Content="置顶显示" AutomationProperties.AutomationId="Topmost"/>
+                                <CheckBox x:Name="Fullscreen" Content="全屏时隐藏" AutomationProperties.AutomationId="Fullscreen"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="互动" Style="{StaticResource SectionTitle}"/>
+                                <CheckBox x:Name="AllowHit" Content="允许受击互动" AutomationProperties.AutomationId="AllowHit"/>
+                                <CheckBox x:Name="Sound" Content="开启声音" AutomationProperties.AutomationId="Sound"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="恢复默认" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="恢复默认设置和桌宠位置，关闭开机启动。历史记录与 Key 会保留。" Style="{StaticResource Hint}"/>
+                                <Button x:Name="ResetButton" Content="恢复默认设置" AutomationProperties.AutomationId="恢复默认设置" Style="{StaticResource DangerButton}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="活动">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,16">
+                    <StackPanel>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="主动活动" Style="{StaticResource SectionTitle}"/>
+                                <CheckBox x:Name="Activity" Content="允许主动活动" AutomationProperties.AutomationId="Activity"/>
+                                <TextBlock Text="活动频率" Style="{StaticResource FieldLabel}"/>
+                                <ComboBox x:Name="frequency" SelectedValuePath="Tag" AutomationProperties.AutomationId="ActivityFrequency">
+                                    <ComboBoxItem Content="低频" Tag="{x:Static settings:ActivityFrequency.Low}"/>
+                                    <ComboBoxItem Content="标准" Tag="{x:Static settings:ActivityFrequency.Normal}"/>
+                                    <ComboBoxItem Content="高频" Tag="{x:Static settings:ActivityFrequency.High}"/>
+                                </ComboBox>
+                                <TextBlock Text="全局冷却（1–180 分钟）" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="Cooldown" AutomationProperties.AutomationId="Cooldown"/>
+                                <CheckBox x:Name="Peek" Content="偷瞄" AutomationProperties.AutomationId="Peek"/>
+                                <CheckBox x:Name="Proud" Content="得意" AutomationProperties.AutomationId="Proud"/>
+                                <CheckBox x:Name="Funny" Content="做鬼脸" AutomationProperties.AutomationId="Funny"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="免打扰时段" Style="{StaticResource SectionTitle}"/>
+                                <CheckBox x:Name="Quiet" Content="启用安静时段" AutomationProperties.AutomationId="Quiet"/>
+                                <TextBlock Text="开始（HH:mm）" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="QuietStart" AutomationProperties.AutomationId="QuietStart"/>
+                                <TextBlock Text="结束（HH:mm）" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="QuietEnd" AutomationProperties.AutomationId="QuietEnd"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="统计与隐私">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,16">
+                    <StackPanel>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="使用记录" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="本地历史最多保留最近 15 天。应用名称和窗口标题可能随启用的 AI 请求发送给服务商。" Style="{StaticResource Hint}"/>
+                                <CheckBox x:Name="Statistics" Content="记录使用统计" AutomationProperties.AutomationId="Statistics"/>
+                                <TextBlock Text="应用分类" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="每行填写：进程名=工作 / 娱乐 / 未分类" Style="{StaticResource Hint}" Margin="0,0,0,8"/>
+                                <TextBox x:Name="Categories" AutomationProperties.AutomationId="Categories" AcceptsReturn="True" Height="100" VerticalScrollBarVisibility="Auto"/>
+                                <TextBlock Text="主动活动黑名单" Style="{StaticResource FieldLabel}"/>
+                                <TextBlock Text="每行一个进程名，在这些应用中减少打扰。" Style="{StaticResource Hint}" Margin="0,0,0,8"/>
+                                <TextBox x:Name="Blacklist" AutomationProperties.AutomationId="Blacklist" AcceptsReturn="True" Height="90" VerticalScrollBarVisibility="Auto"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="导出统计" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="导出开始日期（yyyy-MM-dd）" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="From" AutomationProperties.AutomationId="From"/>
+                                <TextBlock Text="导出结束日期（yyyy-MM-dd）" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="To" AutomationProperties.AutomationId="To"/>
+                                <CheckBox x:Name="Titles" Content="导出标题明细（包含窗口标题）" AutomationProperties.AutomationId="Titles"/>
+                                <Button x:Name="ExportButton" Content="导出统计" AutomationProperties.AutomationId="导出统计" HorizontalAlignment="Left" Margin="0,8,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="清理历史记录" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="清除使用、互动、AI 和日报历史。设置、桌宠位置与 Key 会保留。" Style="{StaticResource Hint}"/>
+                                <Button x:Name="ClearButton" Content="清除历史" AutomationProperties.AutomationId="清除历史" Style="{StaticResource DangerButton}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="AI">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,16">
+                    <StackPanel>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="AI 互动" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="AI 请求会发送当前应用、窗口标题、使用统计和有限历史摘要。Key 仅以当前 Windows 用户的加密密文保存，不会回显。" Style="{StaticResource Hint}"/>
+                                <CheckBox x:Name="Ai" Content="启用 AI" AutomationProperties.AutomationId="AiEnabled"/>
+                                <UniformGrid Columns="2">
+                                    <CheckBox x:Name="RightClick" Content="右键 AI 互动" AutomationProperties.AutomationId="RightClickAiEnabled"/>
+                                    <CheckBox x:Name="Greeting" Content="每日问候 AI" AutomationProperties.AutomationId="Greeting"/>
+                                    <CheckBox x:Name="AiActivity" Content="随机活动 AI" AutomationProperties.AutomationId="AiActivity"/>
+                                    <CheckBox x:Name="Report" Content="日报 AI" AutomationProperties.AutomationId="Report"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="DeepSeek" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="负责生成候选台词" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="DeepSeekStatus" Text="检查中" AutomationProperties.AutomationId="DeepSeekKeyStatus" Margin="0,8" Foreground="{StaticResource AccentBrush}"/>
+                                <PasswordBox x:Name="DeepSeekInput" AutomationProperties.AutomationId="DeepSeekKeyInput" AutomationProperties.Name="DeepSeek API Key"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="SaveDeepSeek" Content="保存 DeepSeek Key" AutomationProperties.AutomationId="保存 DeepSeek Key" Margin="0,0,8,8"/>
+                                    <Button x:Name="DeleteDeepSeek" Content="删除 DeepSeek Key" AutomationProperties.AutomationId="删除 DeepSeek Key" Style="{StaticResource DangerButton}" Margin="0,0,0,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource SettingsCard}">
+                            <StackPanel>
+                                <TextBlock Text="Jev" Style="{StaticResource SectionTitle}"/>
+                                <TextBlock Text="负责选择合适的台词" Style="{StaticResource Hint}"/>
+                                <TextBlock x:Name="JevStatus" Text="检查中" AutomationProperties.AutomationId="JevKeyStatus" Margin="0,8" Foreground="{StaticResource AccentBrush}"/>
+                                <PasswordBox x:Name="JevInput" AutomationProperties.AutomationId="JevKeyInput" AutomationProperties.Name="Jev API Key"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button x:Name="SaveJev" Content="保存 Jev Key" AutomationProperties.AutomationId="保存 Jev Key" Margin="0,0,8,8"/>
+                                    <Button x:Name="DeleteJev" Content="删除 Jev Key" AutomationProperties.AutomationId="删除 Jev Key" Style="{StaticResource DangerButton}" Margin="0,0,0,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="启动">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,8,16">
+                    <Border Style="{StaticResource SettingsCard}" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="启动设置" Style="{StaticResource SectionTitle}"/>
+                            <CheckBox x:Name="Startup" Content="开机启动" AutomationProperties.AutomationId="Startup"/>
+                            <TextBlock Text="开机启动时立即显示托盘，10 秒后显示桌宠；托盘“显示桌宠”可提前结束等待。" Style="{StaticResource Hint}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="24,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="status" AutomationProperties.AutomationId="AiSettingsStatus" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" Margin="0,0,16,0"/>
+                <Button x:Name="SaveSettingsButton" Grid.Column="1" Content="保存设置" AutomationProperties.AutomationId="SaveAiSettings" Style="{StaticResource PrimaryButton}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

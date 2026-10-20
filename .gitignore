@@ -35,3 +35,28 @@ logs/
 reports/local/
 .dotnet-home/
 .codex-verify-*/
+
+# Local agent execution records (project plans remain in docs/)
+.superpowers/
+
+# Environment files, credentials and local usage databases
+.env
+.env.*
+!.env.example
+*.p12
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Runtime diagnostics and local tooling caches
+*.log
+*.log.previous
+/DesktopPuppy-startup-diagnostics*.json
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
